@@ -8,5 +8,7 @@ import (
 var userResourceType = &v2.ResourceType{
 	Id:          "user",
 	DisplayName: "User",
+	Description: "A MongoDB Atlas Organization User",
 	Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
+	Annotations: getSkippEntitlementsAndGrantsAnnotations(),
 }
