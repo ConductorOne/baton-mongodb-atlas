@@ -20,6 +20,7 @@ type MongoDB struct {
 func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
 		newUserBuilder(d.client, d.organizationId),
+		newTeamBuilder(d.client, d.organizationId),
 	}
 }
 
