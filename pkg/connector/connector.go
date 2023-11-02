@@ -19,6 +19,7 @@ type MongoDB struct {
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
+		newOrganizationBuilder(d.client),
 		newUserBuilder(d.client, d.organizationId),
 		newTeamBuilder(d.client, d.organizationId),
 	}

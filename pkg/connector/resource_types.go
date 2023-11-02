@@ -6,6 +6,11 @@ import (
 
 // The user resource type is for all user objects from the database.
 var (
+	organizationResourceType = &v2.ResourceType{
+		Id:          "organization",
+		DisplayName: "Organization",
+		Description: "A MongoDB Atlas Organization",
+	}
 	userResourceType = &v2.ResourceType{
 		Id:          "user",
 		DisplayName: "User",
