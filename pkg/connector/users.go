@@ -11,16 +11,15 @@ import (
 )
 
 type userBuilder struct {
-	resourceType   *v2.ResourceType
-	client         *admin.APIClient
-	organizationId string
+	resourceType *v2.ResourceType
+	client       *admin.APIClient
 }
 
 func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
-func newUserResource(ctx context.Context, user admin.CloudAppUser) (*v2.Resource, error) {
+func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user admin.CloudAppUser) (*v2.Resource, error) {
 	userId := *user.Id
 
 	profile := map[string]interface{}{
@@ -38,7 +37,13 @@ func newUserResource(ctx context.Context, user admin.CloudAppUser) (*v2.Resource
 		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
 	}
 
-	resource, err := rs.NewUserResource(user.Username, userResourceType, userId, userTraits)
+	resource, err := rs.NewUserResource(
+		user.Username,
+		userResourceType,
+		userId,
+		userTraits,
+		rs.WithParentResourceID(organizationId),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -49,19 +54,23 @@ func newUserResource(ctx context.Context, user admin.CloudAppUser) (*v2.Resource
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+	if parentResourceID == nil {
+		return nil, "", nil, nil
+	}
+
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, o.organizationId).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list users")
 	}
 
 	var resources []*v2.Resource
 	for _, user := range users.Results {
-		resource, err := newUserResource(ctx, user)
+		resource, err := newUserResource(ctx, parentResourceID, user)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create user resource")
 		}
@@ -91,10 +100,9 @@ func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func newUserBuilder(client *admin.APIClient, organizationId string) *userBuilder {
+func newUserBuilder(client *admin.APIClient) *userBuilder {
 	return &userBuilder{
-		resourceType:   userResourceType,
-		client:         client,
-		organizationId: organizationId,
+		resourceType: userResourceType,
+		client:       client,
 	}
 }

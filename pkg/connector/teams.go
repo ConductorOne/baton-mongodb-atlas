@@ -14,16 +14,15 @@ import (
 )
 
 type teamBuilder struct {
-	resourceType   *v2.ResourceType
-	client         *admin.APIClient
-	organizationId string
+	resourceType *v2.ResourceType
+	client       *admin.APIClient
 }
 
 func (o *teamBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return teamResourceType
 }
 
-func newTeamResource(ctx context.Context, team admin.TeamResponse) (*v2.Resource, error) {
+func newTeamResource(ctx context.Context, organizationId *v2.ResourceId, team admin.TeamResponse) (*v2.Resource, error) {
 	teamId := *team.Id
 	teamName := *team.Name
 
@@ -36,7 +35,13 @@ func newTeamResource(ctx context.Context, team admin.TeamResponse) (*v2.Resource
 		rs.WithGroupProfile(profile),
 	}
 
-	resource, err := rs.NewGroupResource(teamName, teamResourceType, teamId, teamTraits)
+	resource, err := rs.NewGroupResource(
+		teamName,
+		teamResourceType,
+		teamId,
+		teamTraits,
+		rs.WithParentResourceID(organizationId),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -44,28 +49,31 @@ func newTeamResource(ctx context.Context, team admin.TeamResponse) (*v2.Resource
 	return resource, nil
 }
 
-func newTeamBuilder(client *admin.APIClient, organizationId string) *teamBuilder {
+func newTeamBuilder(client *admin.APIClient) *teamBuilder {
 	return &teamBuilder{
-		resourceType:   teamResourceType,
-		client:         client,
-		organizationId: organizationId,
+		resourceType: teamResourceType,
+		client:       client,
 	}
 }
 
 func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+	if parentResourceID == nil {
+		return nil, "", nil, nil
+	}
+
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, o.organizationId).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list teams")
 	}
 
 	var resources []*v2.Resource
 	for _, team := range teams.Results {
-		resource, err := newTeamResource(ctx, team)
+		resource, err := newTeamResource(ctx, parentResourceID, team)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create team resource")
 		}
@@ -108,14 +116,14 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		return nil, "", nil, err
 	}
 
-	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, o.organizationId, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, resource.ParentResourceId.Resource, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list team members")
 	}
 
 	var rv []*v2.Grant
 	for _, member := range members.Results {
-		userResource, err := newUserResource(ctx, member)
+		userResource, err := newUserResource(ctx, resource.ParentResourceId, member)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create user resource")
 		}

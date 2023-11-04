@@ -29,6 +29,10 @@ func newOrganizationResource(organization admin.AtlasOrganization) (*v2.Resource
 		organization.Name,
 		organizationResourceType,
 		organizationId,
+		rs.WithAnnotation(
+			&v2.ChildResourceType{ResourceTypeId: userResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: teamResourceType.Id},
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -106,7 +110,7 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 
 	var rv []*v2.Grant
 	for _, team := range teams.Results {
-		teamResource, err := newTeamResource(ctx, team)
+		teamResource, err := newTeamResource(ctx, resource.ParentResourceId, team)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create team grant")
 		}
