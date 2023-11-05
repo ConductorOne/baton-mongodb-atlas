@@ -40,6 +40,9 @@ func newProjectResource(ctx context.Context, organizationId *v2.ResourceId, proj
 		projectId,
 		projectTraits,
 		rs.WithParentResourceID(organizationId),
+		rs.WithAnnotation(
+			&v2.ChildResourceType{ResourceTypeId: databaseUserResourceType.Id},
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -56,6 +59,10 @@ func newProjectBuilder(client *admin.APIClient) *projectBuilder {
 }
 
 func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+	if parentResourceID == nil {
+		return nil, "", nil, nil
+	}
+
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: p.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -101,33 +108,52 @@ func (p *projectBuilder) Entitlements(_ context.Context, resource *v2.Resource, 
 	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, entitlement)
 
+	assigmentOptions = []ent.EntitlementOption{
+		ent.WithGrantableTo(databaseUserResourceType),
+		ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
+		ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, memberEntitlement)),
+	}
+
+	entitlement = ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
+	rv = append(rv, entitlement)
+
 	return rv, "", nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: p.resourceType.Id})
+	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseUserResourceType.Id}, &v2.ResourceId{ResourceType: userResourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
-	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list team members")
+	var rv []*v2.Grant
+	var count int
+	switch bag.Current().ResourceTypeID {
+	case databaseUserResourceType.Id:
+		grants, c, err := p.GrantDatabaseUsers(ctx, resource, page)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		count = c
+		rv = append(rv, grants...)
+	case userResourceType.Id:
+		grants, c, err := p.GrantUsers(ctx, resource, page)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		count = c
+		rv = append(rv, grants...)
 	}
 
-	var rv []*v2.Grant
-	for _, member := range members.Results {
-		userResource, err := newUserResource(ctx, resource.ParentResourceId, member)
+	if isLastPage(count, resourcePageSize) {
+		nextPage, err := bag.NextToken("")
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create user resource")
+			return nil, "", nil, err
 		}
 
-		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
-	}
-
-	if isLastPage(*members.TotalCount, resourcePageSize) {
-		return rv, "", nil, nil
+		// Process the next resource type.
+		return rv, nextPage, nil, nil
 	}
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
@@ -135,5 +161,43 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 		return nil, "", nil, err
 	}
 
-	return nil, nextPage, nil, nil
+	return rv, nextPage, nil, nil
+}
+
+func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	if err != nil {
+		return nil, 0, wrapError(err, "failed to list project users")
+	}
+
+	var rv []*v2.Grant
+	for _, member := range members.Results {
+		userResource, err := newUserResource(ctx, resource.ParentResourceId, member)
+		if err != nil {
+			return nil, *members.TotalCount, wrapError(err, "failed to create user resource")
+		}
+
+		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
+	}
+
+	return rv, *members.TotalCount, nil
+}
+
+func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	members, _, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	if err != nil {
+		return nil, 0, wrapError(err, "failed to list project database users")
+	}
+
+	var rv []*v2.Grant
+	for _, member := range members.Results {
+		userResource, err := newDatabaseUserResource(ctx, resource.ParentResourceId, member)
+		if err != nil {
+			return nil, *members.TotalCount, wrapError(err, "failed to create database user resource")
+		}
+
+		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
+	}
+
+	return rv, *members.TotalCount, nil
 }

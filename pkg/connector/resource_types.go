@@ -30,4 +30,11 @@ var (
 		Description: "A MongoDB Atlas Project",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
 	}
+	databaseUserResourceType = &v2.ResourceType{
+		Id:          "database_user",
+		DisplayName: "Database User",
+		Description: "A MongoDB Atlas Database User",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
+		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+	}
 )
