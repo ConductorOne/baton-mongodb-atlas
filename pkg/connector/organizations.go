@@ -32,6 +32,7 @@ func newOrganizationResource(organization admin.AtlasOrganization) (*v2.Resource
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: userResourceType.Id},
 			&v2.ChildResourceType{ResourceTypeId: teamResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: projectResourceType.Id},
 		),
 	)
 	if err != nil {
@@ -93,26 +94,73 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 	ent = entitlement.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
 
+	assigmentOptions = []entitlement.EntitlementOption{
+		entitlement.WithGrantableTo(projectResourceType),
+		entitlement.WithDescription(fmt.Sprintf("Part of %s organization", resource.DisplayName)),
+		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
+	}
+	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
+	rv = append(rv, ent)
+
 	return rv, "", nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: teamResourceType.Id})
+	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: teamResourceType.Id}, &v2.ResourceId{ResourceType: projectResourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
+	var rv []*v2.Grant
+	var count int
+	switch bag.Current().ResourceTypeID {
+	case teamResourceType.Id:
+		grants, c, err := o.GrantTeams(ctx, resource, page)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		count = c
+		rv = append(rv, grants...)
+
+	case projectResourceType.Id:
+		grants, c, err := o.GrantProjects(ctx, resource, page)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		count = c
+		rv = append(rv, grants...)
+	}
+
+	if isLastPage(count, resourcePageSize) {
+		nextPage, err := bag.NextToken("")
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		// Process the next resource type.
+		return rv, nextPage, nil, nil
+	}
+
+	nextPage, err := getPageTokenFromPage(bag, page+1)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	return rv, nextPage, nil, nil
+}
+
+func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list teams")
+		return nil, 0, wrapError(err, "failed to list teams")
 	}
 
 	var rv []*v2.Grant
 	for _, team := range teams.Results {
 		teamResource, err := newTeamResource(ctx, resource.ParentResourceId, team)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create team grant")
+			return nil, *teams.TotalCount, wrapError(err, "failed to create team grant")
 		}
 
 		g := grant.NewGrant(
@@ -131,16 +179,44 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 		rv = append(rv, g)
 	}
 
-	if isLastPage(*teams.TotalCount, resourcePageSize) {
-		return rv, "", nil, nil
-	}
+	return rv, *teams.TotalCount, nil
+}
 
-	nextPage, err := getPageTokenFromPage(bag, page+1)
+func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, 0, wrapError(err, "failed to list projects")
 	}
 
-	return rv, nextPage, nil, nil
+	var rv []*v2.Grant
+	for _, project := range projects.Results {
+		if project.OrgId != resource.Id.Resource {
+			continue
+		}
+
+		projectResource, err := newProjectResource(ctx, resource.ParentResourceId, project)
+		if err != nil {
+			return nil, *projects.TotalCount, wrapError(err, "failed to create project grant")
+		}
+
+		g := grant.NewGrant(
+			resource,
+			partEntitlement,
+			projectResource.Id,
+			// TODO: DB users
+			// grant.WithAnnotation(
+			// 	&v2.GrantExpandable{
+			// 		EntitlementIds:  []string{fmt.Sprintf("project:%s:%s", projectResource.Id.Resource, partEntitlement)},
+			// 		Shallow:         true,
+			// 		ResourceTypeIds: []string{userResourceType.Id},
+			// 	},
+			// ),
+		)
+
+		rv = append(rv, g)
+	}
+
+	return rv, *projects.TotalCount, nil
 }
 
 func newOrganizationBuilder(client *admin.APIClient) *organizationBuilder {

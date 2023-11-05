@@ -20,6 +20,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newOrganizationBuilder(d.client),
 		newUserBuilder(d.client),
 		newTeamBuilder(d.client),
+		newProjectBuilder(d.client),
 	}
 }
 

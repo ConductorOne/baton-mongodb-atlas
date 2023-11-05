@@ -24,4 +24,10 @@ var (
 		Description: "A MongoDB Atlas Team",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
 	}
+	projectResourceType = &v2.ResourceType{
+		Id:          "project",
+		DisplayName: "Project",
+		Description: "A MongoDB Atlas Project",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
+	}
 )
