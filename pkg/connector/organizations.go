@@ -13,6 +13,26 @@ import (
 	"go.mongodb.org/atlas-sdk/v20231001002/admin"
 )
 
+var (
+	userRolesOrganizationEntitlementMap = map[string]string{
+		"ORG_OWNER":             ownerEntitlement,
+		"ORG_GROUP_CREATOR":     projectCreatorEntitlement,
+		"ORG_BILLING_ADMIN":     billingAdminEntitlement,
+		"ORG_BILLING_READ_ONLY": billingViewerEntitlement,
+		"ORG_READ_ONLY":         readOnlyEntitlement,
+		"ORG_MEMBER":            memberEntitlement,
+	}
+	organizationEntitlementsUserRolesMap = reverseMap(userRolesOrganizationEntitlementMap)
+	organizationUserEntitlements         = []string{
+		ownerEntitlement,
+		projectCreatorEntitlement,
+		billingAdminEntitlement,
+		billingViewerEntitlement,
+		readOnlyEntitlement,
+		memberEntitlement,
+	}
+)
+
 type organizationBuilder struct {
 	resourceType *v2.ResourceType
 	client       *admin.APIClient
@@ -78,8 +98,18 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 
+	for _, e := range organizationUserEntitlements {
+		assigmentOptions := []entitlement.EntitlementOption{
+			entitlement.WithGrantableTo(userResourceType),
+			entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
+			entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, memberEntitlement)),
+		}
+		ent := entitlement.NewPermissionEntitlement(resource, e, assigmentOptions...)
+		rv = append(rv, ent)
+	}
+
 	assigmentOptions := []entitlement.EntitlementOption{
-		entitlement.WithGrantableTo(userResourceType),
+		entitlement.WithGrantableTo(teamResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, memberEntitlement)),
 	}
@@ -87,11 +117,11 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 	rv = append(rv, ent)
 
 	assigmentOptions = []entitlement.EntitlementOption{
-		entitlement.WithGrantableTo(teamResourceType),
+		entitlement.WithGrantableTo(databaseUserResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
-		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, memberEntitlement)),
+		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
 	}
-	ent = entitlement.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
+	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
 
 	assigmentOptions = []entitlement.EntitlementOption{
@@ -107,7 +137,12 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: teamResourceType.Id}, &v2.ResourceId{ResourceType: projectResourceType.Id})
+	bag, page, err := parsePageToken(
+		pToken.Token,
+		&v2.ResourceId{ResourceType: teamResourceType.Id},
+		&v2.ResourceId{ResourceType: projectResourceType.Id},
+		&v2.ResourceId{ResourceType: userResourceType.Id},
+	)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -125,6 +160,13 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 
 	case projectResourceType.Id:
 		grants, c, err := o.GrantProjects(ctx, resource, page)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		count = c
+		rv = append(rv, grants...)
+	case userResourceType.Id:
+		grants, c, err := o.GrantUsers(ctx, resource, page)
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -167,13 +209,6 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resou
 			resource,
 			memberEntitlement,
 			teamResource.Id,
-			grant.WithAnnotation(
-				&v2.GrantExpandable{
-					EntitlementIds:  []string{fmt.Sprintf("team:%s:%s", teamResource.Id.Resource, memberEntitlement)},
-					Shallow:         true,
-					ResourceTypeIds: []string{userResourceType.Id},
-				},
-			),
 		)
 
 		rv = append(rv, g)
@@ -203,20 +238,52 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 			resource,
 			partEntitlement,
 			projectResource.Id,
-			// TODO: DB users
-			// grant.WithAnnotation(
-			// 	&v2.GrantExpandable{
-			// 		EntitlementIds:  []string{fmt.Sprintf("project:%s:%s", projectResource.Id.Resource, partEntitlement)},
-			// 		Shallow:         true,
-			// 		ResourceTypeIds: []string{userResourceType.Id},
-			// 	},
-			// ),
+			grant.WithAnnotation(
+				&v2.GrantExpandable{
+					EntitlementIds:  []string{fmt.Sprintf("project:%s:%s", projectResource.Id.Resource, memberEntitlement)},
+					Shallow:         true,
+					ResourceTypeIds: []string{databaseUserResourceType.Id},
+				},
+			),
 		)
 
 		rv = append(rv, g)
 	}
 
 	return rv, *projects.TotalCount, nil
+}
+
+func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	if err != nil {
+		return nil, 0, wrapError(err, "failed to list organization users")
+	}
+
+	var rv []*v2.Grant
+	for _, user := range users.Results {
+		userResource, err := newUserResource(ctx, resource.ParentResourceId, user)
+		if err != nil {
+			return nil, *users.TotalCount, wrapError(err, "failed to create user resource")
+		}
+
+		for _, role := range user.Roles {
+			if role.OrgId == nil {
+				continue
+			}
+
+			roleOrgId := *role.OrgId
+			if roleOrgId != resource.Id.Resource {
+				continue
+			}
+
+			roleName := role.RoleName
+			if entitlement, ok := userRolesOrganizationEntitlementMap[*roleName]; ok {
+				rv = append(rv, grant.NewGrant(resource, entitlement, userResource.Id))
+			}
+		}
+	}
+
+	return rv, *users.TotalCount, nil
 }
 
 func newOrganizationBuilder(client *admin.APIClient) *organizationBuilder {

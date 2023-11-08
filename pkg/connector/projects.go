@@ -13,6 +13,29 @@ import (
 	"go.mongodb.org/atlas-sdk/v20231001002/admin"
 )
 
+var (
+	userRolesProjectEntitlementMap = map[string]string{
+		"GROUP_OWNER":                  ownerEntitlement,
+		"GROUP_CLUSTER_MANAGER":        clusterManagerEntitlement,
+		"GROUP_DATA_ACCESS_ADMIN":      dataAccessAdminEntitlement,
+		"GROUP_DATA_ACCESS_READ_WRITE": dataAccessReadAndWriteEntitlement,
+		"GROUP_DATA_ACCESS_READ_ONLY":  dataAccessReadOnlyEntitlement,
+		"GROUP_READ_ONLY":              readOnlyEntitlement,
+		"GROUP_SEARCH_INDEX_EDITOR":    searchIndexEditorEntitlement,
+	}
+	projectEntitlementsUserRolesMap = reverseMap(userRolesProjectEntitlementMap)
+	projectUserEntitlements         = []string{
+		ownerEntitlement,
+		clusterManagerEntitlement,
+		dataAccessAdminEntitlement,
+		dataAccessReadAndWriteEntitlement,
+		dataAccessReadOnlyEntitlement,
+		readOnlyEntitlement,
+		searchIndexEditorEntitlement,
+		memberEntitlement,
+	}
+)
+
 type projectBuilder struct {
 	resourceType *v2.ResourceType
 	client       *admin.APIClient
@@ -99,22 +122,24 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 func (p *projectBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 
-	assigmentOptions := []ent.EntitlementOption{
-		ent.WithGrantableTo(userResourceType),
-		ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
-		ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, memberEntitlement)),
+	for _, e := range projectUserEntitlements {
+		assigmentOptions := []ent.EntitlementOption{
+			ent.WithGrantableTo(userResourceType),
+			ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
+			ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, e)),
+		}
+
+		entitlement := ent.NewPermissionEntitlement(resource, e, assigmentOptions...)
+		rv = append(rv, entitlement)
 	}
 
-	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
-	rv = append(rv, entitlement)
-
-	assigmentOptions = []ent.EntitlementOption{
+	assigmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(databaseUserResourceType),
 		ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
 		ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, memberEntitlement)),
 	}
 
-	entitlement = ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
+	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, entitlement)
 
 	return rv, "", nil, nil
@@ -177,7 +202,22 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 			return nil, *members.TotalCount, wrapError(err, "failed to create user resource")
 		}
 
-		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
+		for _, role := range member.Roles {
+			if role.GroupId == nil {
+				continue
+			}
+
+			roleProjectId := *role.GroupId
+			if roleProjectId != resource.Id.Resource {
+				continue
+			}
+
+			roleName := role.RoleName
+
+			if entitlement, ok := userRolesProjectEntitlementMap[*roleName]; ok {
+				rv = append(rv, grant.NewGrant(resource, entitlement, userResource.Id))
+			}
+		}
 	}
 
 	return rv, *members.TotalCount, nil
