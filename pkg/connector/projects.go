@@ -10,7 +10,9 @@ import (
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.uber.org/zap"
 )
 
 var (
@@ -240,4 +242,92 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 	}
 
 	return rv, *members.TotalCount, nil
+}
+
+func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
+	if principal.Id.ResourceType != userResourceType.Id {
+		err := fmt.Errorf("mongodb connector: only users can be granted to projects")
+
+		l.Warn(
+			err.Error(),
+			zap.String("principal_id", principal.Id.Resource),
+			zap.String("principal_type", principal.Id.ResourceType),
+		)
+
+		return nil, err
+	}
+
+	user, _, err := p.client.MongoDBCloudUsersApi.GetUser(ctx, principal.Id.Resource).Execute()
+	if err != nil {
+		return nil, wrapError(err, "failed to get user")
+	}
+
+	var entitlementSlug string
+	if slug, ok := projectEntitlementsUserRolesMap[entitlement.Slug]; !ok {
+		err := fmt.Errorf("mongodb connector: unknown entitlement %s", entitlement.Slug)
+
+		l.Warn(
+			err.Error(),
+			zap.String("entitlement_slug", entitlement.Slug),
+		)
+
+		return nil, err
+	} else {
+		entitlementSlug = slug
+	}
+
+	_, _, err = p.client.ProjectsApi.AddUserToProject(
+		ctx,
+		entitlement.Resource.Id.Resource,
+		&admin.GroupInvitationRequest{
+			Username: &user.Username,
+			Roles:    []string{entitlementSlug},
+		},
+	).Execute()
+	if err != nil {
+		err := wrapError(err, "failed to add user to project")
+
+		l.Error(
+			err.Error(),
+			zap.String("user_id", principal.Id.Resource),
+			zap.String("project_id", entitlement.Resource.Id.Resource),
+		)
+
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
+	if grant.Principal.Id.ResourceType != userResourceType.Id {
+		err := fmt.Errorf("mongodb connector: only users can be revoked from projects")
+
+		l.Warn(
+			err.Error(),
+			zap.String("principal_id", grant.Principal.Id.Resource),
+			zap.String("principal_type", grant.Principal.Id.ResourceType),
+		)
+
+		return nil, err
+	}
+
+	_, err := p.client.ProjectsApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute()
+	if err != nil {
+		err := wrapError(err, "failed to remove user from project")
+
+		l.Error(
+			err.Error(),
+			zap.String("user_id", grant.Principal.Id.Resource),
+			zap.String("project_id", grant.Entitlement.Resource.Id.Resource),
+		)
+
+		return nil, err
+	}
+
+	return nil, nil
 }
