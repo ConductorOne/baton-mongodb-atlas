@@ -22,8 +22,7 @@ var (
 		"ORG_READ_ONLY":         readOnlyEntitlement,
 		"ORG_MEMBER":            memberEntitlement,
 	}
-	organizationEntitlementsUserRolesMap = reverseMap(userRolesOrganizationEntitlementMap)
-	organizationUserEntitlements         = []string{
+	organizationUserEntitlements = []string{
 		ownerEntitlement,
 		projectCreatorEntitlement,
 		billingAdminEntitlement,
