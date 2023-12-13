@@ -6,18 +6,88 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"go.mongodb.org/atlas-sdk/v20231001002/admin"
 )
 
-type userBuilder struct{}
+type userBuilder struct {
+	resourceType *v2.ResourceType
+	client       *admin.APIClient
+}
 
 func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
+func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user admin.CloudAppUser) (*v2.Resource, error) {
+	userId := *user.Id
+
+	profile := map[string]interface{}{
+		"first_name": user.FirstName,
+		"last_name":  user.LastName,
+		"email":      user.EmailAddress,
+		"login":      user.Username,
+		"user_id":    userId,
+		"county":     user.Country,
+	}
+
+	userTraits := []rs.UserTraitOption{
+		rs.WithUserProfile(profile),
+		rs.WithUserLogin(user.Username),
+		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
+	}
+
+	resource, err := rs.NewUserResource(
+		user.Username,
+		userResourceType,
+		userId,
+		userTraits,
+		rs.WithParentResourceID(organizationId),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}
+
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+	if parentResourceID == nil {
+		return nil, "", nil, nil
+	}
+
+	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	if err != nil {
+		return nil, "", nil, wrapError(err, "failed to list users")
+	}
+
+	var resources []*v2.Resource
+	for _, user := range users.Results {
+		resource, err := newUserResource(ctx, parentResourceID, user)
+		if err != nil {
+			return nil, "", nil, wrapError(err, "failed to create user resource")
+		}
+
+		resources = append(resources, resource)
+	}
+
+	if isLastPage(*users.TotalCount, resourcePageSize) {
+		return resources, "", nil, nil
+	}
+
+	nextPage, err := getPageTokenFromPage(bag, page+1)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	return resources, nextPage, nil, nil
 }
 
 // Entitlements always returns an empty slice for users.
@@ -30,6 +100,9 @@ func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func newUserBuilder() *userBuilder {
-	return &userBuilder{}
+func newUserBuilder(client *admin.APIClient) *userBuilder {
+	return &userBuilder{
+		resourceType: userResourceType,
+		client:       client,
+	}
 }
