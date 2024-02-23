@@ -1,5 +1,10 @@
 name: civ2
-on: workflow_dispatch
+on: 
+  # Triggers the workflow on workflow_dispatch or pull request events but only for the mchavez-mongodb branch
+  workflow_dispatch:
+    branches: [ mchavez-mongodb ]
+  pull_request:
+    branches: [ mchavez-mongodb ] 
 jobs:
   go-lint:
     runs-on: ubuntu-latest
