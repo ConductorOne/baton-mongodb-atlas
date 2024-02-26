@@ -32,7 +32,7 @@ jobs:
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.10.0
         with:
-          mongodb-version: '6.0'
+          mongodb-version: mongo:latest
       - name: Run baton-mongodb
         env:
           BATON_PUBLIC_KEY: 'jyzkthbd'
