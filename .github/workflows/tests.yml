@@ -1,12 +1,12 @@
-name: Tests
-on: [workflow_dispatch, pull_request]
+name: tests
+on: [workflow_dispatch]
 
 jobs:
   test:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        mongodb-version: ['4.4.14', '5.0.9']
+        mongodb-version: ['4.4.6', '5.0.9']
 
     services:
       mongodb:
