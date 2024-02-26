@@ -35,9 +35,10 @@ jobs:
       - name: Start MongoDB
         uses: MongoCamp/mongodb-github-action@1.0.0
         with:
-          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-version: mongodb:6.0.13
           mongodb-username: admin
           mongodb-pwd: admin
+      - run: curl http://localhost:27017
       - name: Run baton-mongodb
         env:
           BATON_PUBLIC_KEY: 'jyzkthbd'
