@@ -1,4 +1,4 @@
-name: civ2
+name: Tests
 on: 
   # Triggers the workflow on workflow_dispatch or pull request events but only for the mchavez-mongodb branch
   workflow_dispatch:
@@ -39,9 +39,16 @@ jobs:
       - name: Initalize MongoDB
         run: |
           mongosh --host localhost:27017 -u admin -p admin --authenticationDatabase admin <<EOF
-            db = db.getSiblingDB('testdb');
-            db.createUser({ user: 'test', pwd: 'secretpwd', roles: [{ role: 'readWrite', db: 'APP-DB' }] })
-            db.createCollection('resources');
+            db = db.getSiblingDB('APP-DB');
+            db.createUser({ user: 'APP-USERNAME', pwd: 'APP-PASSWORD', roles: [{ role: 'readWrite', db: 'APP-DB' }] })
+            db.createCollection('APP-COLLECTION');
           EOF
-          # Do it here
-          
+          # Do whatever you like in here
+
+    # setting up local build tools
+
+      - name: Test
+        run: |
+          echo "Running integration Tests"
+     
+    # ...  
