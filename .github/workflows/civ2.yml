@@ -44,3 +44,4 @@ jobs:
             db.createCollection('resources');
           EOF
           # Do it here
+          
