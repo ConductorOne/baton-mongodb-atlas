@@ -1,4 +1,4 @@
-name: tests
+name: Tests
 on: [workflow_dispatch, pull_request]
 
 jobs:
@@ -27,6 +27,9 @@ jobs:
           go-version: 1.20.x
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Build baton-mongodb
+        run: go build ./cmd/baton-mongodb
 
       - name: Install mongosh
         run: |
