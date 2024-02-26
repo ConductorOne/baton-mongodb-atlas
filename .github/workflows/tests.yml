@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        mongodb-version: ['4.4.6', '5.0.9']
+        mongodb-version: ['4.4.14', '5.0.9']
 
     services:
       mongodb:
@@ -36,6 +36,8 @@ jobs:
         uses: MongoCamp/mongodb-github-action@1.0.0
         with:
           mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-username: admin
+          mongodb-pwd: admin
       - name: Run baton-mongodb
         env:
           BATON_PUBLIC_KEY: 'jyzkthbd'
