@@ -15,7 +15,7 @@ jobs:
         env:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: admin
-          MONGO_INITDB_DATABASE: APP-DATABASE
+          MONGO_INITDB_DATABASE: testdb
         ports:
           - 27017:27017
         options: >-
@@ -25,8 +25,13 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
-
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
       - name: Install mongosh
         run: |
           sudo apt-get install gnupg
@@ -39,10 +44,11 @@ jobs:
       - name: Initalize MongoDB
         run: |
           mongosh --host localhost:27017 -u admin -p admin --authenticationDatabase admin <<EOF
-            db = db.getSiblingDB('APP-DB');
-            db.createUser({ user: 'APP-USERNAME', pwd: 'APP-PASSWORD', roles: [{ role: 'readWrite', db: 'APP-DB' }] })
-            db.createCollection('APP-COLLECTION');
+            db = db.getSiblingDB('testdb');
+            db.createUser({ user: 'mongodbuser', pwd: 'secretpassword', roles: [{ role: 'readWrite', db: 'testdb' }] })
+            db.createCollection('connector');
           EOF
+
           # Do whatever you like in here
 
     # setting up local build tools
