@@ -27,10 +27,8 @@ jobs:
           go-version: 1.20.x
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Build baton-mongodb
         run: go build ./cmd/baton-mongodb
-
       - name: Install mongosh
         run: |
           sudo apt-get install gnupg
@@ -39,12 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mongodb-mongosh
           mongosh --version
-
-      - name: Run baton-mongodb
-        run: |
-          echo "Running integration Tests"
-          ./baton-mongodb --public-key 'jyzkthbd' --private-key '3b14d374-68f7-4eb8-be60-fd3fd893743e'
-
+          ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
       - name: Initalize MongoDB
         run: |
           mongosh --host localhost:27017 -u admin -p admin --authenticationDatabase admin <<EOF
@@ -52,4 +45,8 @@ jobs:
             db.createUser({ user: 'mongodbuser', pwd: 'secretpassword', roles: [{ role: 'readWrite', db: 'testdb' }] })
             db.createCollection('connector');
           EOF
+      - name: Run baton-mongodb
+        run: |
+          echo "Running integration Tests"
+          ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
     # ...  
