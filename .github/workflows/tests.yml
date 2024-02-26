@@ -47,13 +47,10 @@ jobs:
             db.createUser({ user: 'mongodbuser', pwd: 'secretpassword', roles: [{ role: 'readWrite', db: 'testdb' }] })
             db.createCollection('connector');
           EOF
-
-          # Do whatever you like in here
-
-    # setting up local build tools
-
-      - name: Test
+          
+      - name: Run baton-mongodb
         run: |
           echo "Running integration Tests"
+          ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
      
     # ...  
