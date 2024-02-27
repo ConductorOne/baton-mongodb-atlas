@@ -4,11 +4,6 @@ on: [workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        BATON_PUBLIC_KEY: ['jyzkthbd']
-        BATON_PRIVATE_KEY: ['3b14d374-68f7-4eb8-be60-fd3fd893743e']
-
     services:
       mongodb:
         image: mongo:4.4.6
