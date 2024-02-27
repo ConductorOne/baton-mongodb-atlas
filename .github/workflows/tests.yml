@@ -33,11 +33,11 @@ jobs:
         uses: actions/checkout@v3
       - name: Build baton-mongodb
         run: go build ./cmd/baton-mongodb
-      - name: Setup AtlasCLI
-        uses: mongodb/atlas-github-action@v0.2.0
-      - name: Use AtlasCLI
-        shell: bash
-        run: atlas --version 
+      # - name: Setup AtlasCLI
+      #   uses: mongodb/atlas-github-action@v0.2.0
+      # - name: Use AtlasCLI
+      #   shell: bash
+      #   run: atlas --version 
       - name: Install mongosh
         run: |
           sudo apt-get install gnupg
@@ -53,6 +53,6 @@ jobs:
         run: |
           echo "Running integration Tests"
           # ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
-          docker run --rm -v $(pwd):/out -e ghcr.io/conductorone/baton-mongodb:latest
-          docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest resources
+          docker run --rm -v "$(pwd):/out" -e ghcr.io/conductorone/baton-mongodb:latest
+          docker run --rm -v "$(pwd):/out" ghcr.io/conductorone/baton:latest resources
     # ...  
