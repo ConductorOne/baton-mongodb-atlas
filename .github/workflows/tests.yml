@@ -54,7 +54,9 @@ jobs:
           echo "Running integration Tests"
           # ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
           # docker run --rm -v "$(pwd):/out" -e ghcr.io/conductorone/baton-mongodb:latest
-          docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
+          # docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
           go install github.com/conductorone/baton/cmd/baton@main
           go install github.com/conductorone/baton-mongodb/cmd/baton-mongodb@main
+          BATON_PUBLIC_KEY=jyzkthbd BATON_PRIVATE_KEY=3b14d374-68f7-4eb8-be60-fd3fd893743e baton-mongodb
+          baton resources
     # ...  
