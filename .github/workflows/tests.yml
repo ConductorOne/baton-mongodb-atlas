@@ -55,4 +55,5 @@ jobs:
       - name: Grant entitlements
         if: ${{ env.GRANT_ENTITLEMENT != '' }}
         run: ./baton-mongodb --log-level=debug  --grant-entitlement GRANT_ENTITLEMENT --grant-principal GRANT_PRINCIPAL --grant-principal-type GRANT_PRINCIPAL_TYPE
-      
+      - name: List Resources
+        run: ./baton resources
