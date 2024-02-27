@@ -11,6 +11,8 @@ jobs:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: admin
           MONGO_INITDB_DATABASE: testdb
+          BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
+          BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
         ports:
           - 27017:27017
         options: >-
