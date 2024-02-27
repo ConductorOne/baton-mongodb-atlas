@@ -42,3 +42,5 @@ jobs:
           BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
           BATON_LOG_LEVEL: 'debug'
         run: ./baton-mongodb 
+      - name: Revoke grants
+        run: ./baton-mongodb --log-level=debug --revoke-grant 'team:65de391acee49637479ff761:member:user:6000932cdb25974d816dd711'
