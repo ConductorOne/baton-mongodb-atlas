@@ -49,11 +49,11 @@ jobs:
           mongosh --version
       - name: Run baton-mongodb-cmd
         run: ./baton-mongodb 
-      - name: Revoke grants
-        if: ${{ env.REVOKE_GRANT != '' }}
-        run: ./baton-mongodb --log-level=debug --revoke-grant REVOKE_GRANT
       - name: Grant entitlements
         if: env.GRANT_ENTITLEMENT != '' && env.GRANT_PRINCIPAL != '' && env.GRANT_PRINCIPAL_TYPE != ''
         run: ./baton-mongodb --log-level=debug  --grant-entitlement GRANT_ENTITLEMENT --grant-principal GRANT_PRINCIPAL --grant-principal-type GRANT_PRINCIPAL_TYPE
+      - name: Revoke grants
+        if: env.REVOKE_GRANT != ''
+        run: ./baton-mongodb --log-level=debug --revoke-grant REVOKE_GRANT
       - name: List Resources
         run: docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
