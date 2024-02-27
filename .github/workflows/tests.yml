@@ -46,16 +46,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mongodb-mongosh
           mongosh --version
-      - name: Run baton-mongodb
+      - name: Run baton-mongodb v2
         env:
           BATON_PUBLIC_KEY: 'jyzkthbd'
           BATON_PRIVATE_KEY: '3b14d374-68f7-4eb8-be60-fd3fd893743e'
-        # run: ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
-        run: docker --help
-      - name: Run baton-mongodb v2
         run: |
           echo "Running integration Tests"
           # ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
-          docker run --rm -v $(pwd):/out -e ghcr.io/conductorone/baton-mongodb:latest -f "/out/sync.c1z"
-          docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
+          docker run --rm -v $(pwd):/out -e ghcr.io/conductorone/baton-mongodb:latest
+          docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest resources
     # ...  
