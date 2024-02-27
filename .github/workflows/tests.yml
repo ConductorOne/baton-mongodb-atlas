@@ -6,7 +6,8 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        mongodb-version: ['5.0.9']
+        BATON_PUBLIC_KEY: ['jyzkthbd']
+        BATON_PRIVATE_KEY: ['3b14d374-68f7-4eb8-be60-fd3fd893743e']
 
     services:
       mongodb:
@@ -55,4 +56,6 @@ jobs:
         run: |
           echo "Running integration Tests"
           # ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
+          docker run --rm -v $(pwd):/out -e ${{ matrix.BATON_PUBLIC_KEY }} ${{ matrix.BATON_PRIVATE_KEY }} ghcr.io/conductorone/baton-mongodb:latest -f "/out/sync.c1z"
+          docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
     # ...  
