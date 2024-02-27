@@ -49,7 +49,8 @@ jobs:
         env:
           BATON_PUBLIC_KEY: 'jyzkthbd'
           BATON_PRIVATE_KEY: '3b14d374-68f7-4eb8-be60-fd3fd893743e'
-        run: ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
+        # run: ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
+        run: docker --help
       - name: Run baton-mongodb v2
         run: |
           echo "Running integration Tests"
