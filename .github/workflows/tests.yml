@@ -55,7 +55,6 @@ jobs:
           # ./baton-mongodb --public-key jyzkthbd --private-key 3b14d374-68f7-4eb8-be60-fd3fd893743e
           # docker run --rm -v "$(pwd):/out" -e ghcr.io/conductorone/baton-mongodb:latest
           docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
-          # NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-          brew install conductorone/baton/baton conductorone/baton/baton-mongodb
+          go install github.com/conductorone/baton/cmd/baton@main
+          go install github.com/conductorone/baton-mongodb/cmd/baton-mongodb@main
     # ...  
