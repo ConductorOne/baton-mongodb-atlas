@@ -1,20 +1,20 @@
-project_name: baton-mongodb
+project_name: baton-mongodb-atlas
 builds:
-  - binary: baton-mongodb
+  - binary: baton-mongodb-atlas
     env:
       - CGO_ENABLED=0
     id: linux
-    main: ./cmd/baton-mongodb
+    main: ./cmd/baton-mongodb-atlas
     goos:
       - linux
     goarch:
       - amd64
       - arm64
-  - binary: baton-mongodb
+  - binary: baton-mongodb-atlas
     env:
       - CGO_ENABLED=0
     id: macos-amd64
-    main: ./cmd/baton-mongodb
+    main: ./cmd/baton-mongodb-atlas
     goos:
       - darwin
     goarch:
@@ -22,12 +22,12 @@ builds:
     hooks:
       post:
         - gon .gon-amd64.json
-        - mv dist/baton-mongodb-darwin-amd64.signed.zip dist/macos-amd64_darwin_amd64_v1/baton-mongodb
-  - binary: baton-mongodb
+        - mv dist/baton-mongodb-atlas-darwin-amd64.signed.zip dist/macos-amd64_darwin_amd64_v1/baton-mongodb-atlas
+  - binary: baton-mongodb-atlas
     env:
       - CGO_ENABLED=0
     id: macos-arm64
-    main: ./cmd/baton-mongodb
+    main: ./cmd/baton-mongodb-atlas
     goos:
       - darwin
     goarch:
@@ -35,7 +35,7 @@ builds:
     hooks:
       post:
         - gon .gon-arm64.json
-        - mv dist/baton-mongodb-darwin-arm64.signed.zip dist/macos-arm64_darwin_arm64/baton-mongodb
+        - mv dist/baton-mongodb-atlas-darwin-arm64.signed.zip dist/macos-arm64_darwin_arm64/baton-mongodb-atlas
 archives:
   - id: linux-archive
     builds:
@@ -71,9 +71,9 @@ brews:
     folder: Formula
     homepage: https://conductorone.com
     test: |
-      system "#{bin}/baton-mongodb -v"
+      system "#{bin}/baton-mongodb-atlas -v"
     install: |-
-      bin.install "baton-mongodb"
+      bin.install "baton-mongodb-atlas"
 changelog:
   filters:
     exclude:

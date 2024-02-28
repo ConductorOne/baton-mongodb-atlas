@@ -1,4 +1,4 @@
-module github.com/conductorone/baton-mongodb
+module github.com/conductorone/baton-mongodb-atlas
 
 go 1.20
 
