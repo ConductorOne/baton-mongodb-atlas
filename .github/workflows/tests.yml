@@ -5,20 +5,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-20.04
-    services:
-      mongodb:
-        image: mongo:4.4.6
-        env:
-          MONGO_INITDB_ROOT_USERNAME: admin
-          MONGO_INITDB_ROOT_PASSWORD: admin
-          MONGO_INITDB_DATABASE: testdb
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd mongo
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
         BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
         BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
