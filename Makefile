@@ -3,14 +3,14 @@ GOARCH = $(shell go env GOARCH)
 BUILD_DIR = dist/${GOOS}_${GOARCH}
 
 ifeq ($(GOOS),windows)
-OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb.exe
+OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb-atlas.exe
 else
-OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb
+OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb-atlas
 endif
 
 .PHONY: build
 build:
-	go build -o ${OUTPUT_PATH} ./cmd/baton-mongodb
+	go build -o ${OUTPUT_PATH} ./cmd/baton-mongodb-atlas
 
 .PHONY: update-deps
 update-deps:
