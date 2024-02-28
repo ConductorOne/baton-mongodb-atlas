@@ -54,6 +54,7 @@ jobs:
         run: |
           echo "REVOKE_GRANT: $REVOKE_GRANT" 
           echo ${{ env.REVOKE_GRANT }}
+          echo env.REVOKE_GRANT
           ./baton-mongodb --log-level=debug --revoke-grant env.REVOKE_GRANT
 
       - name: Grant entitlements
