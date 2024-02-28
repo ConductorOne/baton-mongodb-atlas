@@ -246,8 +246,7 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
-	fmt.Println(principal.Id.ResourceType)
-	fmt.Println(userResourceType.Id)
+
 	if principal.Id.ResourceType != userResourceType.Id {
 		err := fmt.Errorf("mongodb connector: only users can be granted to projects")
 
