@@ -4,7 +4,7 @@ on:
   push:
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
         BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
         BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
