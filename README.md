@@ -1,4 +1,4 @@
-[Baton Logo](./docs/images/baton-logo.png)
+![Baton Logo](./docs/images/baton-logo.png)
 
 # `baton-mongodb` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-mongodb.svg)](https://pkg.go.dev/github.com/conductorone/baton-mongodb) ![main ci](https://github.com/conductorone/baton-mongodb/actions/workflows/main.yaml/badge.svg)
 

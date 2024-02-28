@@ -1,0 +1,45 @@
+name: tests
+on: 
+  workflow_dispatch:
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+        BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
+        BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
+        BATON_LOG_LEVEL: 'debug'
+        # Revoke grants variable
+        REVOKE_GRANT: 'team:65de391acee49637479ff761:member:user:6000932cdb25974d816dd711'
+        # Grant entitlements variables
+        GRANT_ENTITLEMENT: 'team:65de391acee49637479ff761:member'
+        GRANT_PRINCIPAL: '6000932cdb25974d816dd711'
+        GRANT_PRINCIPAL_TYPE: 'user'
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.0
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Build baton-mongodb
+        run: go build ./cmd/baton-mongodb
+      - name: Run baton-mongodb-cmd
+        run: ./baton-mongodb 
+      - name: Revoke grants
+        if: ${{ env.REVOKE_GRANT }} != ''
+        run: |
+          echo "Syncing resources..."
+          ./baton-mongodb
+          echo "Testing revoking"
+          ./baton-mongodb --log-level=debug --revoke-grant ${{ env.REVOKE_GRANT }}
+      - name: Grant entitlements
+        if: ${{ env.GRANT_ENTITLEMENT }} != '' && ${{ env.GRANT_PRINCIPAL }} != '' && ${{ env.GRANT_PRINCIPAL_TYPE }} != ''
+        run: |
+          echo "Syncing resources..."
+          ./baton-mongodb
+          echo "Testing provisioning"
+          ./baton-mongodb --log-level=debug  --grant-entitlement ${{ env.GRANT_ENTITLEMENT }} --grant-principal ${{ env.GRANT_PRINCIPAL }} --grant-principal-type ${{ env.GRANT_PRINCIPAL_TYPE }}
+      - name: List Resources
+        run: docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
