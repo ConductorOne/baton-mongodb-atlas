@@ -50,11 +50,9 @@ jobs:
       - name: Run baton-mongodb-cmd
         run: ./baton-mongodb 
       - name: Revoke grants
-        if: env.REVOKE_GRANT != ''
+        if: ${{ env.REVOKE_GRANT }} != ''
         run: |
-          echo "REVOKE_GRANT: $REVOKE_GRANT" 
-          echo ${{ env.REVOKE_GRANT }}
-          echo env.REVOKE_GRANT
+          echo "Revoking " + ${{ env.REVOKE_GRANT }}
           ./baton-mongodb --log-level=debug --revoke-grant ${{ env.REVOKE_GRANT }}
 
       - name: Grant entitlements
