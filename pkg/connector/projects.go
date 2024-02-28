@@ -192,7 +192,6 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 }
 
 func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	fmt.Println("--- GrantUsers ---")
 	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list project users")
@@ -227,7 +226,6 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	fmt.Println("--- GrantDatabaseUsers ---")
 	members, _, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list project database users")
@@ -247,7 +245,6 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 }
 
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
-	fmt.Println("--- Grant Organization ---")
 	l := ctxzap.Extract(ctx)
 	fmt.Println(principal.Id.ResourceType)
 	fmt.Println(userResourceType.Id)

@@ -113,7 +113,6 @@ func (o *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	fmt.Println("---Grants ---")
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -148,13 +147,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 
 func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
-	fmt.Println("--- teams Grant ---")
-	fmt.Println("principal.Id.ResourceType")
-	fmt.Println(principal.Id.ResourceType)
-	fmt.Println(principal)
-	fmt.Println("userResourceType.Id")
-	fmt.Println(userResourceType.Id)
-	fmt.Println(userResourceType)
+
 	if principal.Id.ResourceType != userResourceType.Id {
 		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
 

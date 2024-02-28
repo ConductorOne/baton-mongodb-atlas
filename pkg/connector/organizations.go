@@ -136,7 +136,6 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	fmt.Println("--- Grants ---")
 	bag, page, err := parsePageToken(
 		pToken.Token,
 		&v2.ResourceId{ResourceType: teamResourceType.Id},
@@ -193,7 +192,6 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 }
 
 func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	fmt.Println("--- GrantTeams ---")
 	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list teams")
@@ -219,7 +217,6 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resou
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	fmt.Println("--- GrantTeams ---")
 	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list projects")
@@ -256,7 +253,6 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	fmt.Println("--- GrantTeams ---")
 	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list organization users")
