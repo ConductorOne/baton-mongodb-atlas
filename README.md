@@ -44,7 +44,6 @@ baton resources
 
 - Users
 - Database Users
-- Roles
 - Projects
 - Teams
 - Organizations
