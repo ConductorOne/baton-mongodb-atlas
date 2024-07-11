@@ -78,7 +78,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(*users.TotalCount, resourcePageSize) {
+	if isLastPage(len(users.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 

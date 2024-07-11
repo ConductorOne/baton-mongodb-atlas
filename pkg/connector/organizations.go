@@ -82,7 +82,7 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(*organizations.TotalCount, resourcePageSize) {
+	if isLastPage(len(organizations.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -213,7 +213,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resou
 		rv = append(rv, g)
 	}
 
-	return rv, *teams.TotalCount, nil
+	return rv, len(teams.Results), nil
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -249,7 +249,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 		rv = append(rv, g)
 	}
 
-	return rv, *projects.TotalCount, nil
+	return rv, len(projects.Results), nil
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -282,7 +282,7 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resou
 		}
 	}
 
-	return rv, *users.TotalCount, nil
+	return rv, len(users.Results), nil
 }
 
 func newOrganizationBuilder(client *admin.APIClient) *organizationBuilder {

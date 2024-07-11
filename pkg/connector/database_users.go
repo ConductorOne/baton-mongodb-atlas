@@ -59,12 +59,10 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if parentResourceID == nil {
 		return nil, "", nil, nil
 	}
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
-
 	users, _, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.Resource).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list database users")
@@ -80,7 +78,7 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(*users.TotalCount, resourcePageSize) {
+	if isLastPage(len(users.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 

@@ -83,7 +83,7 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(*teams.TotalCount, resourcePageSize) {
+	if isLastPage(len(teams.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -133,7 +133,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
-	if isLastPage(*members.TotalCount, resourcePageSize) {
+	if isLastPage(len(members.Results), resourcePageSize) {
 		return rv, "", nil, nil
 	}
 
