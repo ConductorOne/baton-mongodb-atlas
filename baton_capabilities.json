@@ -1,77 +1,77 @@
 {
-  "@type": "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
-  "resourceTypeCapabilities": [
+  "@type":  "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
+  "resourceTypeCapabilities":  [
     {
-      "resourceType": {
-        "id": "database_user",
-        "displayName": "Database User",
-        "traits": [
+      "resourceType":  {
+        "id":  "database_user",
+        "displayName":  "Database User",
+        "traits":  [
           "TRAIT_USER"
         ],
-        "annotations": [
+        "annotations":  [
           {
-            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+            "@type":  "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
           }
         ],
-        "description": "A MongoDB Atlas Database User"
+        "description":  "A MongoDB Atlas Database User"
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType": {
-        "id": "organization",
-        "displayName": "Organization",
-        "description": "A MongoDB Atlas Organization"
+      "resourceType":  {
+        "id":  "organization",
+        "displayName":  "Organization",
+        "description":  "A MongoDB Atlas Organization"
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType": {
-        "id": "project",
-        "displayName": "Project",
-        "traits": [
+      "resourceType":  {
+        "id":  "project",
+        "displayName":  "Project",
+        "traits":  [
           "TRAIT_GROUP"
         ],
-        "description": "A MongoDB Atlas Project"
+        "description":  "A MongoDB Atlas Project"
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ]
     },
     {
-      "resourceType": {
-        "id": "team",
-        "displayName": "Team",
-        "traits": [
+      "resourceType":  {
+        "id":  "team",
+        "displayName":  "Team",
+        "traits":  [
           "TRAIT_GROUP"
         ],
-        "description": "A MongoDB Atlas Team"
+        "description":  "A MongoDB Atlas Team"
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ]
     },
     {
-      "resourceType": {
-        "id": "user",
-        "displayName": "User",
-        "traits": [
+      "resourceType":  {
+        "id":  "user",
+        "displayName":  "User",
+        "traits":  [
           "TRAIT_USER"
         ],
-        "annotations": [
+        "annotations":  [
           {
-            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+            "@type":  "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
           }
         ],
-        "description": "A MongoDB Atlas Organization User"
+        "description":  "A MongoDB Atlas Organization User"
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ]
     }
