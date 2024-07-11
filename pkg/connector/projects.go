@@ -108,7 +108,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(*projects.TotalCount, resourcePageSize) {
+	if isLastPage(len(projects.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -222,7 +222,7 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 		}
 	}
 
-	return rv, *members.TotalCount, nil
+	return rv, len(members.Results), nil
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -241,7 +241,7 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
-	return rv, *members.TotalCount, nil
+	return rv, len(members.Results), nil
 }
 
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
