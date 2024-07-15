@@ -222,7 +222,7 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 		}
 	}
 
-	return rv, len(members.Results), nil
+	return rv, *members.TotalCount, nil
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -241,7 +241,7 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
-	return rv, len(members.Results), nil
+	return rv, *members.TotalCount, nil
 }
 
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {

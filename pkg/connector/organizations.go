@@ -213,7 +213,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resou
 		rv = append(rv, g)
 	}
 
-	return rv, len(teams.Results), nil
+	return rv, *teams.TotalCount, nil
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -249,7 +249,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 		rv = append(rv, g)
 	}
 
-	return rv, len(projects.Results), nil
+	return rv, *projects.TotalCount, nil
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -282,7 +282,7 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resou
 		}
 	}
 
-	return rv, len(users.Results), nil
+	return rv, *users.TotalCount, nil
 }
 
 func newOrganizationBuilder(client *admin.APIClient) *organizationBuilder {
