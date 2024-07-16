@@ -93,7 +93,20 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		return nil, "", nil, err
 	}
 
-	projects, _, err := p.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	logger := ctxzap.Extract(ctx)
+	logger.Debug(
+		"fetching a page of projects",
+		zap.Int("pageNum", page),
+		zap.Int("ItemsPerPage", resourcePageSize),
+	)
+
+	projects, _, err := p.client.
+		ProjectsApi.
+		ListProjects(ctx).
+		PageNum(page).
+		ItemsPerPage(resourcePageSize).
+		IncludeCount(true).
+		Execute()
 	if err != nil {
 		return nil, "", nil, err
 	}
