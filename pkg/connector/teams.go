@@ -133,7 +133,15 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		return nil, "", nil, err
 	}
 
-	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, resource.GetParentResourceId().GetResource(), resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	l := ctxzap.Extract(ctx)
+	orgId, teamId, err := parseTeamResourceId(resource.Id.Resource)
+	if err != nil {
+		l.Warn("failed to parse team resource id", zap.Error(err))
+		teamId = resource.Id.Resource
+		orgId = resource.GetParentResourceId().GetResource()
+	}
+
+	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list team members")
 	}
