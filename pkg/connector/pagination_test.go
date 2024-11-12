@@ -90,11 +90,11 @@ func TestPagination(t *testing.T) {
 		}{
 			{
 				0,
-				`{"states":null,"current_state":{"token":"0","resource_type_id":"","resource_id":""}}`,
+				`{"states":null,"current_state":{"token":"0"}}`,
 			},
 			{
 				10,
-				`{"states":null,"current_state":{"token":"10","resource_type_id":"","resource_id":""}}`,
+				`{"states":null,"current_state":{"token":"10"}}`,
 			},
 		}
 		for _, testCase := range testCases {

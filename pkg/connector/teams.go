@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -24,7 +25,16 @@ func (o *teamBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return teamResourceType
 }
 
-func newTeamResource(ctx context.Context, organizationId *v2.ResourceId, team admin.TeamResponse) (*v2.Resource, error) {
+func parseTeamResourceId(resourceId string) (string, string, error) {
+	parts := strings.Split(resourceId, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid resource id")
+	}
+
+	return parts[0], parts[1], nil
+}
+
+func newTeamResource(_ context.Context, organizationId *v2.ResourceId, team admin.TeamResponse) (*v2.Resource, error) {
 	teamId := *team.Id
 	teamName := *team.Name
 
@@ -33,14 +43,19 @@ func newTeamResource(ctx context.Context, organizationId *v2.ResourceId, team ad
 		"name":    teamName,
 	}
 
+	if organizationId != nil {
+		profile["organization_id"] = organizationId.Resource
+	}
+
 	teamTraits := []rs.GroupTraitOption{
 		rs.WithGroupProfile(profile),
 	}
 
+	resourceId := fmt.Sprintf("%s:%s", organizationId.Resource, teamId)
 	resource, err := rs.NewGroupResource(
 		teamName,
 		teamResourceType,
-		teamId,
+		resourceId,
 		teamTraits,
 		rs.WithParentResourceID(organizationId),
 	)
@@ -118,7 +133,15 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		return nil, "", nil, err
 	}
 
-	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, resource.ParentResourceId.Resource, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	l := ctxzap.Extract(ctx)
+	orgId, teamId, err := parseTeamResourceId(resource.Id.Resource)
+	if err != nil {
+		l.Warn("failed to parse team resource id", zap.Error(err))
+		teamId = resource.Id.Resource
+		orgId = resource.GetParentResourceId().GetResource()
+	}
+
+	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list team members")
 	}
@@ -148,25 +171,31 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
+	userId := principal.Id.Resource
 	if principal.Id.ResourceType != userResourceType.Id {
 		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
 
 		l.Warn(
 			err.Error(),
-			zap.String("principal_id", principal.Id.Resource),
+			zap.String("principal_id", userId),
 			zap.String("principal_type", principal.Id.ResourceType),
 		)
 
 		return nil, err
 	}
 
-	_, _, err := o.client.TeamsApi.AddTeamUser(
+	orgId, teamId, err := parseTeamResourceId(entitlement.GetResource().GetId().GetResource())
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, err = o.client.TeamsApi.AddTeamUser(
 		ctx,
-		principal.ParentResourceId.Resource,
-		entitlement.Resource.Id.Resource,
+		orgId,
+		teamId,
 		&[]admin.AddUserToTeam{
 			{
-				Id: principal.Id.Resource,
+				Id: userId,
 			},
 		}).Execute()
 	if err != nil {
@@ -174,8 +203,9 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 		l.Error(
 			err.Error(),
-			zap.String("team_id", entitlement.Resource.Id.Resource),
-			zap.String("user_id", principal.Id.Resource),
+			zap.String("org_id", orgId),
+			zap.String("team_id", teamId),
+			zap.String("user_id", userId),
 		)
 
 		return nil, err
@@ -187,26 +217,33 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
+	userId := grant.Principal.Id.Resource
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be revoked from teams")
+		err := fmt.Errorf("mongodb connector: only users can be removed from teams")
 
 		l.Warn(
 			err.Error(),
-			zap.String("principal_id", grant.Principal.Id.Resource),
+			zap.String("principal_id", userId),
 			zap.String("principal_type", grant.Principal.Id.ResourceType),
 		)
 
 		return nil, err
 	}
 
-	_, err := o.client.TeamsApi.RemoveTeamUser(ctx, grant.Principal.ParentResourceId.Resource, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute()
+	orgId, teamId, err := parseTeamResourceId(grant.Entitlement.GetResource().GetId().GetResource())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute()
 	if err != nil {
 		err := wrapError(err, "failed to remove user from team")
 
 		l.Error(
 			err.Error(),
-			zap.String("team_id", grant.Entitlement.Resource.Id.Resource),
-			zap.String("user_id", grant.Principal.Id.Resource),
+			zap.String("org_id", orgId),
+			zap.String("team_id", teamId),
+			zap.String("user_id", userId),
 		)
 
 		return nil, err
