@@ -24,6 +24,9 @@ jobs:
         run: go build -o connector ./cmd/baton-mongodb-atlas
 
       - name: Run and save output
+        env:
+          BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
+          BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
         run: ./connector capabilities > baton_capabilities.json
 
       - name: Commit changes
