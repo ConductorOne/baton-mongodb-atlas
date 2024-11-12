@@ -216,7 +216,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 	return rv, len(teams.Results), nil
 }
 
-func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list projects")
@@ -224,17 +224,17 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 
 	var rv []*v2.Grant
 	for _, project := range projects.Results {
-		if project.OrgId != resource.Id.Resource {
+		if project.OrgId != orgResource.Id.Resource {
 			continue
 		}
 
-		projectResource, err := newProjectResource(ctx, resource.ParentResourceId, project)
+		projectResource, err := newProjectResource(ctx, orgResource.Id, project)
 		if err != nil {
 			return nil, *projects.TotalCount, wrapError(err, "failed to create project grant")
 		}
 
 		g := grant.NewGrant(
-			resource,
+			orgResource,
 			partEntitlement,
 			projectResource.Id,
 			grant.WithAnnotation(
@@ -252,15 +252,15 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, resource *v2.Re
 	return rv, len(projects.Results), nil
 }
 
-func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list organization users")
 	}
 
 	var rv []*v2.Grant
 	for _, user := range users.Results {
-		userResource, err := newUserResource(ctx, resource.ParentResourceId, user)
+		userResource, err := newUserResource(ctx, orgResource.Id, user)
 		if err != nil {
 			return nil, *users.TotalCount, wrapError(err, "failed to create user resource")
 		}
@@ -271,13 +271,13 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, resource *v2.Resou
 			}
 
 			roleOrgId := *role.OrgId
-			if roleOrgId != resource.Id.Resource {
+			if roleOrgId != orgResource.Id.Resource {
 				continue
 			}
 
 			roleName := role.RoleName
 			if entitlement, ok := userRolesOrganizationEntitlementMap[*roleName]; ok {
-				rv = append(rv, grant.NewGrant(resource, entitlement, userResource.Id))
+				rv = append(rv, grant.NewGrant(orgResource, entitlement, userResource.Id))
 			}
 		}
 	}
