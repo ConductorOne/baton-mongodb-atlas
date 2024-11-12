@@ -177,6 +177,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 		l.Error(
 			err.Error(),
+			zap.String("org_id", orgId),
 			zap.String("team_id", teamId),
 			zap.String("user_id", userId),
 		)
@@ -211,6 +212,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 		l.Error(
 			err.Error(),
+			zap.String("org_id", orgId),
 			zap.String("team_id", teamId),
 			zap.String("user_id", userId),
 		)
