@@ -9,10 +9,8 @@ jobs:
         BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
         BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
         BATON_LOG_LEVEL: 'debug'
-        # Revoke grants variable
-        REVOKE_GRANT: 'team:65de391acee49637479ff761:member:user:6000932cdb25974d816dd711'
-        # Grant entitlements variables
-        GRANT_ENTITLEMENT: 'team:65de391acee49637479ff761:member'
+        REVOKE_GRANT: 'team:6000932e2ec3c0065eade2e6:65de391acee49637479ff761:member:user:6000932cdb25974d816dd711'
+        GRANT_ENTITLEMENT: 'team:6000932e2ec3c0065eade2e6:65de391acee49637479ff761:member'
         GRANT_PRINCIPAL: '6000932cdb25974d816dd711'
         GRANT_PRINCIPAL_TYPE: 'user'
 
