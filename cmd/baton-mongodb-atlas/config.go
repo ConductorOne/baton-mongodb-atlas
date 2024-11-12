@@ -1,35 +1,26 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/conductorone/baton-sdk/pkg/cli"
-	"github.com/spf13/cobra"
+	"github.com/conductorone/baton-sdk/pkg/field"
 )
 
-// config defines the external configuration required for the connector to run.
-type config struct {
-	cli.BaseConfig `mapstructure:",squash"` // Puts the base config options in the same place as the connector options
+var publicKeyField = field.StringField("public-key",
+	field.WithDescription(``),
+	field.WithRequired(true),
+)
+var privateKeyField = field.StringField("private-key",
+	field.WithDescription(``),
+	field.WithRequired(true),
+)
 
-	PublicKey  string `mapstructure:"public-key"`
-	PrivateKey string `mapstructure:"private-key"`
+var configFields = []field.SchemaField{
+	publicKeyField,
+	privateKeyField,
 }
 
-// validateConfig is run after the configuration is loaded, and should return an error if it isn't valid.
-func validateConfig(ctx context.Context, cfg *config) error {
-	if cfg.PublicKey == "" {
-		return fmt.Errorf("public-key is required")
-	}
+var configRelations = []field.SchemaFieldRelationship{}
 
-	if cfg.PrivateKey == "" {
-		return fmt.Errorf("private-key is required")
-	}
-
-	return nil
-}
-
-func cmdFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("public-key", "", "Public Key")
-	cmd.PersistentFlags().String("private-key", "", "Private Key")
+var cfg = field.Configuration{
+	Fields:      configFields,
+	Constraints: configRelations,
 }
