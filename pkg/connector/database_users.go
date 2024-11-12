@@ -63,7 +63,7 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if err != nil {
 		return nil, "", nil, err
 	}
-	users, _, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.Resource).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	users, _, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.GetResource()).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list database users")
 	}

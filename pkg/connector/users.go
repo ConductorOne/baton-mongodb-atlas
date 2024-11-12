@@ -63,7 +63,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list users")
 	}
