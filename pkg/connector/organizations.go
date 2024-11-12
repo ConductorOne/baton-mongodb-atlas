@@ -10,9 +10,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20231001002/admin"
-	"go.uber.org/zap"
 )
 
 var (
@@ -193,28 +191,21 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	return rv, nextPage, nil, nil
 }
 
-func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	l := ctxzap.Extract(ctx)
-	_, teamId, err := parseTeamResourceId(resource.GetId().GetResource())
-	if err != nil {
-		l.Warn("failed to parse team resource id", zap.Error(err), zap.String("resource_id", resource.GetId().GetResource()))
-		teamId = resource.GetId().GetResource()
-	}
-
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, teamId).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
+	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list teams")
 	}
 
 	var rv []*v2.Grant
 	for _, team := range teams.Results {
-		teamResource, err := newTeamResource(ctx, resource.ParentResourceId, team)
+		teamResource, err := newTeamResource(ctx, orgResource.Id, team)
 		if err != nil {
 			return nil, *teams.TotalCount, wrapError(err, "failed to create team grant")
 		}
 
 		g := grant.NewGrant(
-			resource,
+			orgResource,
 			memberEntitlement,
 			teamResource.Id,
 		)
