@@ -50,6 +50,9 @@ func isLastPage(count int, pageSize int) bool {
 }
 
 func getPageTokenFromPage(bag *pagination.Bag, page int) (string, error) {
+	if bag.Current() == nil {
+		return "", fmt.Errorf("pagination bag is empty")
+	}
 	nextPage := fmt.Sprintf("%d", page)
 	pageToken, err := bag.NextToken(nextPage)
 	if err != nil {
