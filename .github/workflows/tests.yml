@@ -18,11 +18,11 @@ jobs:
 
     steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.22.0
+          go-version: 1.22.x
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Build baton-mongodb-atlas
         run: go build ./cmd/baton-mongodb-atlas
       - name: Run baton-mongodb-atlas-cmd
