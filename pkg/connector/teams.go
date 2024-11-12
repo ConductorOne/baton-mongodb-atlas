@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -24,7 +25,16 @@ func (o *teamBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return teamResourceType
 }
 
-func newTeamResource(ctx context.Context, organizationId *v2.ResourceId, team admin.TeamResponse) (*v2.Resource, error) {
+func parseTeamResourceId(resourceId string) (string, string, error) {
+	parts := strings.Split(resourceId, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid resource id")
+	}
+
+	return parts[0], parts[1], nil
+}
+
+func newTeamResource(_ context.Context, organizationId *v2.ResourceId, team admin.TeamResponse) (*v2.Resource, error) {
 	teamId := *team.Id
 	teamName := *team.Name
 
@@ -33,14 +43,19 @@ func newTeamResource(ctx context.Context, organizationId *v2.ResourceId, team ad
 		"name":    teamName,
 	}
 
+	if organizationId != nil {
+		profile["organization_id"] = organizationId.Resource
+	}
+
 	teamTraits := []rs.GroupTraitOption{
 		rs.WithGroupProfile(profile),
 	}
 
+	resourceId := fmt.Sprintf("%s:%s", organizationId.Resource, teamId)
 	resource, err := rs.NewGroupResource(
 		teamName,
 		teamResourceType,
-		teamId,
+		resourceId,
 		teamTraits,
 		rs.WithParentResourceID(organizationId),
 	)
@@ -161,9 +176,12 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		return nil, err
 	}
 
-	orgId := principal.GetParentResourceId().GetResource()
-	teamId := entitlement.GetResource().GetId().GetResource()
-	_, _, err := o.client.TeamsApi.AddTeamUser(
+	orgId, teamId, err := parseTeamResourceId(entitlement.GetResource().GetId().GetResource())
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, err = o.client.TeamsApi.AddTeamUser(
 		ctx,
 		orgId,
 		teamId,
@@ -204,9 +222,12 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, err
 	}
 
-	orgId := grant.Principal.GetParentResourceId().GetResource()
-	teamId := grant.Entitlement.GetResource().GetId().GetResource()
-	_, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute()
+	orgId, teamId, err := parseTeamResourceId(grant.Entitlement.GetResource().GetId().GetResource())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute()
 	if err != nil {
 		err := wrapError(err, "failed to remove user from team")
 

@@ -10,7 +10,9 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.uber.org/zap"
 )
 
 var (
@@ -192,7 +194,14 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 }
 
 func (o *organizationBuilder) GrantTeams(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	l := ctxzap.Extract(ctx)
+	_, teamId, err := parseTeamResourceId(resource.GetId().GetResource())
+	if err != nil {
+		l.Warn("failed to parse team resource id", zap.Error(err), zap.String("resource_id", resource.GetId().GetResource()))
+		teamId = resource.GetId().GetResource()
+	}
+
+	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, teamId).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list teams")
 	}
