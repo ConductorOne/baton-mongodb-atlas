@@ -22,6 +22,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newTeamBuilder(d.client),
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
+		newMongoClusterBuilder(d.client),
 	}
 }
 

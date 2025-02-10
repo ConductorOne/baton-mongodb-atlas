@@ -37,4 +37,12 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
 		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
 	}
+
+	mongoClusterUserResourceType = &v2.ResourceType{
+		Id:          "mongo_cluster",
+		DisplayName: "Mongo Cluster",
+		Description: "A MongoDB Atlas Cluster",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
+		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+	}
 )
