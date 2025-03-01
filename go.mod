@@ -1,8 +1,8 @@
 module github.com/conductorone/baton-mongodb-atlas
 
-go 1.22
+go 1.23
 
-toolchain go1.23.2
+toolchain go1.23.6
 
 require (
 	github.com/conductorone/baton-sdk v0.2.45
