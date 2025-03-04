@@ -67,7 +67,7 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		return nil, "", nil, err
 	}
 
-	organizations, _, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	organizations, _, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list organizations")
 	}
@@ -192,7 +192,7 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 }
 
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list teams")
 	}
@@ -217,7 +217,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list projects")
 	}
@@ -253,7 +253,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list organization users")
 	}

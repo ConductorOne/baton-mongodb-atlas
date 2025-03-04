@@ -83,7 +83,7 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list teams")
 	}
@@ -141,7 +141,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		orgId = resource.GetParentResourceId().GetResource()
 	}
 
-	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute()
+	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list team members")
 	}
@@ -197,7 +197,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			{
 				Id: userId,
 			},
-		}).Execute()
+		}).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to add user to team")
 
@@ -235,7 +235,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, err
 	}
 
-	_, err = o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute()
+	_, err = o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to remove user from team")
 

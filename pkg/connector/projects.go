@@ -67,6 +67,7 @@ func newProjectResource(ctx context.Context, organizationId *v2.ResourceId, proj
 		rs.WithParentResourceID(organizationId),
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: databaseUserResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: mongoClusterUserResourceType.Id},
 		),
 	)
 	if err != nil {
@@ -106,7 +107,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		PageNum(page).
 		ItemsPerPage(resourcePageSize).
 		IncludeCount(true).
-		Execute()
+		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -205,7 +206,7 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 }
 
 func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list project users")
 	}
@@ -239,7 +240,7 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, _, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute()
+	members, _, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list project database users")
 	}
@@ -272,7 +273,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		return nil, err
 	}
 
-	user, _, err := p.client.MongoDBCloudUsersApi.GetUser(ctx, principal.Id.Resource).Execute()
+	user, _, err := p.client.MongoDBCloudUsersApi.GetUser(ctx, principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, wrapError(err, "failed to get user")
 	}
@@ -298,7 +299,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 			Username: &user.Username,
 			Roles:    []string{entitlementSlug},
 		},
-	).Execute()
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to add user to project")
 
@@ -329,7 +330,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	_, err := p.client.ProjectsApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute()
+	_, err := p.client.ProjectsApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to remove user from project")
 
