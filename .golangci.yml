@@ -28,8 +28,6 @@ linters-settings:
     severity: error
     rules:
       - name: atomic
-      - name: line-length-limit
-        arguments: [ 200 ]
       # These are functions that we use without checking the errors often. Most of these can't return an error even
       # though they implement an interface that can.
       - name: unhandled-error

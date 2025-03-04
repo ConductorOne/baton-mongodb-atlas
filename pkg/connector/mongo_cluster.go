@@ -52,7 +52,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	response, resp, err := o.client.ClustersApi.ListClusters(ctx, parentResourceID.GetResource()).
 		PageNum(currentPage).
 		IncludeDeletedWithRetainedBackups(true).
-		Execute()
+		Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
 		return nil, "", nil, parseToUHttpError(resp, err)
