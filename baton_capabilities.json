@@ -21,6 +21,24 @@
     },
     {
       "resourceType": {
+        "id": "mongo_cluster",
+        "displayName": "Mongo Cluster",
+        "traits": [
+          "TRAIT_APP"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          }
+        ],
+        "description": "A MongoDB Atlas Cluster"
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType": {
         "id": "organization",
         "displayName": "Organization",
         "description": "A MongoDB Atlas Organization"
