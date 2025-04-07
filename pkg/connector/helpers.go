@@ -32,6 +32,10 @@ func reverseMap(m map[string]string) map[string]string {
 }
 
 func parseToUHttpError(resp *http.Response, err error) error {
+	if resp == nil {
+		return err
+	}
+
 	switch resp.StatusCode {
 	case http.StatusRequestTimeout:
 		return uhttp.WrapErrorsWithRateLimitInfo(codes.DeadlineExceeded, resp, err)
