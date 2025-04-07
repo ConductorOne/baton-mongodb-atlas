@@ -53,7 +53,6 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		PageNum(currentPage).
 		IncludeDeletedWithRetainedBackups(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
-
 	if err != nil {
 		return nil, "", nil, parseToUHttpError(resp, err)
 	}
