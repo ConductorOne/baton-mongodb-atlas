@@ -75,9 +75,11 @@ Flags:
   -h, --help                   help for baton-mongodb-atlas
       --log-format string      The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
       --log-level string       The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
-      --private-key string     Private Key
-  -p, --provisioning           This must be set in order for provisioning actions to be enabled. ($BATON_PROVISIONING)
-      --public-key string      Public Key
+      --private-key string     required: ($BATON_PRIVATE_KEY)
+  -p, --provisioning           This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
+      --public-key string      required: ($BATON_PUBLIC_KEY)
+      --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
+      --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
   -v, --version                version for baton-mongodb-atlas
 
 Use "baton-mongodb-atlas [command] --help" for more information about a command.
