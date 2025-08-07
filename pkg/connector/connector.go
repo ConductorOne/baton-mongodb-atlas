@@ -46,6 +46,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
 						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 					},
+					Order: 1,
 				},
 				"organizationId": {
 					DisplayName: "Organization ID",
@@ -55,7 +56,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 					},
 					Placeholder: "Enter Organization ID",
-					Order:       1,
+					Order:       2,
 				},
 				"roles": {
 					DisplayName: "Roles",
@@ -66,6 +67,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 							DefaultValue: make([]string, 0),
 						},
 					},
+					Order: 3,
 				},
 				"teamIds": {
 					DisplayName: "Team IDs",
@@ -76,6 +78,25 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 							DefaultValue: make([]string, 0),
 						},
 					},
+					Order: 4,
+				},
+				"databaseName": {
+					DisplayName: "Database Name",
+					Required:    true,
+					Description: "The name of the database to which the user will have access.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Order: 5,
+				},
+				"groupId": {
+					DisplayName: "Group ID",
+					Required:    true,
+					Description: "The ID of the MongoDB Atlas project (group) to which the database",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Order: 6,
 				},
 			},
 		},
