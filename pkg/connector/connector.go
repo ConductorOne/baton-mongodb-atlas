@@ -35,8 +35,50 @@ func (d *MongoDB) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.Rea
 // Metadata returns metadata about the connector.
 func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
-		DisplayName: "My Baton Connector",
-		Description: "The template implementation of a baton connector",
+		DisplayName: "MongoDB Atlas Connector",
+		Description: "Provides access to MongoDB Atlas resources.",
+		AccountCreationSchema: &v2.ConnectorAccountCreationSchema{
+			FieldMap: map[string]*v2.ConnectorAccountCreationSchema_Field{
+				"email": {
+					DisplayName: "Email",
+					Required:    true,
+					Description: "The email address of the MongoDB Atlas account.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+				},
+				"organizationId": {
+					DisplayName: "Organization ID",
+					Required:    true,
+					Description: "The ID of the MongoDB Atlas organization to which the account belongs.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "Enter Organization ID",
+					Order:       1,
+				},
+				"roles": {
+					DisplayName: "Roles",
+					Required:    false,
+					Description: "The roles to assign to the account.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringListField{
+						StringListField: &v2.ConnectorAccountCreationSchema_StringListField{
+							DefaultValue: make([]string, 0),
+						},
+					},
+				},
+				"teamIds": {
+					DisplayName: "Team IDs",
+					Required:    false,
+					Description: "The IDs of the teams to which the account belongs.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringListField{
+						StringListField: &v2.ConnectorAccountCreationSchema_StringListField{
+							DefaultValue: make([]string, 0),
+						},
+					},
+				},
+			},
+		},
 	}, nil
 }
 

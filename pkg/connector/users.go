@@ -2,6 +2,12 @@ package connector
 
 import (
 	"context"
+	"fmt"
+	"strings"
+
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -98,6 +104,71 @@ func (o *userBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
+}
+
+func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.CredentialOptions) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
+	profile := accountInfo.Profile.AsMap()
+
+	l.Info("aaa", zap.Any("profile", profile))
+
+	orgId, ok := profile["organizationId"].(string)
+	if orgId == "" || !ok {
+		return nil, nil, annotations.Annotations{}, fmt.Errorf("organizationId is empty")
+	}
+
+	email, ok := profile["email"].(string)
+	if email == "" || !ok {
+		return nil, nil, annotations.Annotations{}, fmt.Errorf("email is empty")
+	}
+
+	_, _, err := o.client.OrganizationsApi.CreateOrganizationInvitation(
+		ctx,
+		orgId,
+		&admin.OrganizationInvitationRequest{
+			Username:             &email,
+			Roles:                parseStrList(profile["roles"], []string{"ORG_MEMBER"}),
+			TeamIds:              parseStrList(profile["teamIds"], []string{}),
+			GroupRoleAssignments: nil,
+		},
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+
+	if err != nil {
+		l.Error(
+			"failed to create organization invitation",
+			zap.Error(err),
+		)
+		return nil, nil, nil, err
+	}
+
+	response := &v2.CreateAccountResponse_SuccessResult{
+		IsCreateAccountResult: true,
+	}
+
+	return response, nil, nil, err
+}
+
+func parseStrList(strFrom any, defaultValue []string) []string {
+	str, ok := strFrom.(string)
+	if !ok {
+		return defaultValue
+	}
+
+	if str == "" {
+		return defaultValue
+	}
+
+	return strings.Split(strings.TrimSpace(str), ",")
+}
+
+func (o *userBuilder) CreateAccountCapabilityDetails(ctx context.Context) (*v2.CredentialDetailsAccountProvisioning, annotations.Annotations, error) {
+	return &v2.CredentialDetailsAccountProvisioning{
+		SupportedCredentialOptions: []v2.CapabilityDetailCredentialOption{
+			v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD,
+		},
+		PreferredCredentialOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD,
+	}, nil, nil
 }
 
 func newUserBuilder(client *admin.APIClient) *userBuilder {
