@@ -48,6 +48,15 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 					},
 					Order: 1,
 				},
+				"username": {
+					DisplayName: "Username",
+					Required:    true,
+					Description: "The username for the database user.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Order: 2,
+				},
 				"organizationId": {
 					DisplayName: "Organization ID",
 					Required:    true,
@@ -56,7 +65,16 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 					},
 					Placeholder: "Enter Organization ID",
-					Order:       2,
+					Order:       3,
+				},
+				"groupId": {
+					DisplayName: "Group ID",
+					Required:    true,
+					Description: "Unique 24-hexadecimal digit string that identifies the project.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Order: 4,
 				},
 				"roles": {
 					DisplayName: "Roles",
@@ -67,7 +85,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 							DefaultValue: make([]string, 0),
 						},
 					},
-					Order: 3,
+					Order: 5,
 				},
 				"teamIds": {
 					DisplayName: "Team IDs",
@@ -78,7 +96,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 							DefaultValue: make([]string, 0),
 						},
 					},
-					Order: 4,
+					Order: 6,
 				},
 				"databaseName": {
 					DisplayName: "Database Name",
@@ -87,16 +105,7 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
 						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 					},
-					Order: 5,
-				},
-				"groupId": {
-					DisplayName: "Group ID",
-					Required:    true,
-					Description: "The ID of the MongoDB Atlas project (group) to which the database",
-					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
-						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
-					},
-					Order: 6,
+					Order: 7,
 				},
 			},
 		},

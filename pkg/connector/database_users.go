@@ -133,6 +133,11 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("databaseName is empty")
 	}
 
+	username, ok := profile["username"].(string)
+	if username == "" || !ok {
+		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
+	}
+
 	err := o.createUserIfNotExists(ctx, orgId, email, profile)
 	if err != nil {
 		l.Error(
@@ -155,8 +160,14 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		&admin.CloudDatabaseUser{
 			GroupId:      groupId,
 			Password:     &password,
-			Username:     email,
+			Username:     username,
 			DatabaseName: databaseName,
+			Roles: []admin.DatabaseUserRole{
+				{
+					DatabaseName: databaseName,
+					RoleName:     "read",
+				},
+			},
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
