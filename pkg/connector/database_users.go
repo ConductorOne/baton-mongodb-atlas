@@ -191,7 +191,7 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 			},
 		),
 		rs.WithUserLogin(username),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
+		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
 	}
 
 	resource, err := rs.NewUserResource(
