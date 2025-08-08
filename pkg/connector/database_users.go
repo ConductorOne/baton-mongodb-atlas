@@ -182,8 +182,28 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
+	userFromApi, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(
+		ctx,
+		groupId,
+		databaseName,
+		username,
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	resource, err := newDatabaseUserResource(ctx, &v2.ResourceId{
+		ResourceType: projectResourceType.Id,
+		Resource:     groupId,
+	}, *userFromApi)
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	response := &v2.CreateAccountResponse_SuccessResult{
 		IsCreateAccountResult: true,
+		Resource:              resource,
 	}
 
 	plaintextData := []*v2.PlaintextData{
