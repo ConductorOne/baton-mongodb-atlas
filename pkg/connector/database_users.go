@@ -182,28 +182,20 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
-	userTraits := []rs.UserTraitOption{
-		rs.WithUserProfile(
-			map[string]interface{}{
-				"username":      username,
-				"login":         username,
-				"database_name": databaseName,
-			},
-		),
-		rs.WithUserLogin(username),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
+	userFromApi, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(
+		ctx,
+		groupId,
+		databaseName,
+		username,
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	resource, err := rs.NewUserResource(
-		username,
-		databaseUserResourceType,
-		username,
-		userTraits,
-		rs.WithParentResourceID(&v2.ResourceId{
-			ResourceType: projectResourceType.Id,
-			Resource:     groupId,
-		}),
-	)
+	resource, err := newDatabaseUserResource(ctx, &v2.ResourceId{
+		ResourceType: projectResourceType.Id,
+		Resource:     groupId,
+	}, *userFromApi)
 
 	if err != nil {
 		return nil, nil, nil, err
