@@ -19,8 +19,9 @@ import (
 )
 
 type databaseUserBuilder struct {
-	resourceType *v2.ResourceType
-	client       *admin.APIClient
+	resourceType    *v2.ResourceType
+	client          *admin.APIClient
+	createInviteKey bool
 }
 
 func (o *databaseUserBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -54,10 +55,11 @@ func newDatabaseUserResource(ctx context.Context, projectId *v2.ResourceId, user
 	return resource, nil
 }
 
-func newDatabaseUserBuilder(client *admin.APIClient) *databaseUserBuilder {
+func newDatabaseUserBuilder(client *admin.APIClient, createInviteKey bool) *databaseUserBuilder {
 	return &databaseUserBuilder{
-		resourceType: databaseUserResourceType,
-		client:       client,
+		resourceType:    databaseUserResourceType,
+		client:          client,
+		createInviteKey: createInviteKey,
 	}
 }
 
@@ -138,13 +140,15 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
 	}
 
-	err := o.createUserIfNotExists(ctx, orgId, email, profile)
-	if err != nil {
-		l.Error(
-			"failed to create organization invitation",
-			zap.Error(err),
-		)
-		return nil, nil, nil, err
+	if o.createInviteKey {
+		err := o.createUserIfNotExists(ctx, orgId, email, profile)
+		if err != nil {
+			l.Error(
+				"failed to create organization invitation",
+				zap.Error(err),
+			)
+			return nil, nil, nil, err
+		}
 	}
 
 	password, err := crypto.GeneratePassword(credentialOptions)

@@ -41,7 +41,8 @@ func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, e
 
 	publicKey := v.GetString("public-key")
 	privateKey := v.GetString("private-key")
-	cb, err := connector.New(ctx, publicKey, privateKey)
+	createInviteKey := v.GetBool("create-invite-key")
+	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err

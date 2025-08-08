@@ -12,10 +12,15 @@ var privateKeyField = field.StringField("private-key",
 	field.WithDescription(``),
 	field.WithRequired(true),
 )
+var createInviteKeyField = field.BoolField("create-invite-key",
+	field.WithDescription("Create the invitation user email"),
+	field.WithRequired(false),
+)
 
 var configFields = []field.SchemaField{
 	publicKeyField,
 	privateKeyField,
+	createInviteKeyField,
 }
 
 var configRelations = []field.SchemaFieldRelationship{}

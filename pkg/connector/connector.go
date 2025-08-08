@@ -11,7 +11,8 @@ import (
 )
 
 type MongoDB struct {
-	client *admin.APIClient
+	client          *admin.APIClient
+	createInviteKey bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -21,7 +22,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newUserBuilder(d.client),
 		newTeamBuilder(d.client),
 		newProjectBuilder(d.client),
-		newDatabaseUserBuilder(d.client),
+		newDatabaseUserBuilder(d.client, d.createInviteKey),
 		newMongoClusterBuilder(d.client),
 	}
 }
@@ -119,13 +120,14 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string) (*MongoDB, error) {
+func New(ctx context.Context, publicKey, privateKey string, createInviteKey bool) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err
 	}
 
 	return &MongoDB{
-		client: client,
+		client:          client,
+		createInviteKey: createInviteKey,
 	}, nil
 }
