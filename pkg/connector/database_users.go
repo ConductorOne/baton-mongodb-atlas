@@ -182,8 +182,20 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
+	resource, err := rs.NewUserResource(
+		username,
+		databaseUserResourceType,
+		username,
+		nil,
+	)
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	response := &v2.CreateAccountResponse_SuccessResult{
 		IsCreateAccountResult: true,
+		Resource:              resource,
 	}
 
 	plaintextData := []*v2.PlaintextData{
