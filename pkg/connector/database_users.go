@@ -182,11 +182,27 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
+	userTraits := []rs.UserTraitOption{
+		rs.WithUserProfile(
+			map[string]interface{}{
+				"username":      username,
+				"login":         username,
+				"database_name": databaseName,
+			},
+		),
+		rs.WithUserLogin(username),
+		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
+	}
+
 	resource, err := rs.NewUserResource(
 		username,
 		databaseUserResourceType,
 		username,
-		nil,
+		userTraits,
+		rs.WithParentResourceID(&v2.ResourceId{
+			ResourceType: projectResourceType.Id,
+			Resource:     groupId,
+		}),
 	)
 
 	if err != nil {
