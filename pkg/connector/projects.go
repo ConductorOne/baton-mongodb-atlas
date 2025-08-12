@@ -153,6 +153,7 @@ func (p *projectBuilder) Entitlements(_ context.Context, resource *v2.Resource, 
 		ent.WithGrantableTo(databaseUserResourceType),
 		ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
 		ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, memberEntitlement)),
+		ent.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 
 	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
