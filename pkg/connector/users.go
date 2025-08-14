@@ -16,6 +16,7 @@ type atlasUserResponse interface {
 	GetLastName() string
 	GetUsername() string
 	GetCountry() string
+	GetOrgMembershipStatus() string
 }
 
 type userBuilder struct {

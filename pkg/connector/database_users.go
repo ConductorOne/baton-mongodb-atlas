@@ -169,7 +169,7 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 			return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
 		}
 	} else {
-		user, _, err = o.client.MongoDBCloudUsersApi.GetUserByUsername(ctx, email).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		response, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgId).Username(email).Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
 			if atlasErr, ok := admin.AsError(err); ok {
 				switch atlasErr.ErrorCode {
@@ -181,6 +181,21 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 			}
 
 			return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", err)
+		}
+
+		if response.Results == nil {
+			return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
+		}
+
+		for _, userResponse := range *response.Results {
+			if userResponse.GetUsername() == email {
+				user = &userResponse
+				break
+			}
+		}
+
+		if user == nil {
+			return nil, nil, nil, fmt.Errorf("user '%s' not found", email)
 		}
 	}
 
