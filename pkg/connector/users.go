@@ -7,8 +7,16 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
+
+type atlasUserResponse interface {
+	GetId() string
+	GetFirstName() string
+	GetLastName() string
+	GetUsername() string
+	GetCountry() string
+}
 
 type userBuilder struct {
 	resourceType *v2.ResourceType
@@ -19,26 +27,26 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
-func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user admin.CloudAppUser) (*v2.Resource, error) {
-	userId := *user.Id
+func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user atlasUserResponse) (*v2.Resource, error) {
+	userId := user.GetId()
 
 	profile := map[string]interface{}{
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
-		"email":      user.EmailAddress,
-		"login":      user.Username,
+		"first_name": user.GetFirstName(),
+		"last_name":  user.GetLastName(),
+		"email":      user.GetUsername(),
+		"login":      user.GetUsername(),
 		"user_id":    userId,
-		"county":     user.Country,
+		"county":     user.GetCountry(),
 	}
 
 	userTraits := []rs.UserTraitOption{
 		rs.WithUserProfile(profile),
-		rs.WithUserLogin(user.Username),
+		rs.WithUserLogin(user.GetUsername()),
 		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
 	}
 
 	resource, err := rs.NewUserResource(
-		user.Username,
+		user.GetUsername(),
 		userResourceType,
 		userId,
 		userTraits,
@@ -63,14 +71,18 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list users")
 	}
 
+	if users.Results == nil {
+		return nil, "", nil, nil
+	}
+
 	var resources []*v2.Resource
-	for _, user := range users.Results {
-		resource, err := newUserResource(ctx, parentResourceID, user)
+	for _, user := range *users.Results {
+		resource, err := newUserResource(ctx, parentResourceID, &user)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create user resource")
 		}
@@ -78,7 +90,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(len(users.Results), resourcePageSize) {
+	if isLastPage(len(*users.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 

@@ -12,7 +12,7 @@ import (
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
 )
 
@@ -88,8 +88,12 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, wrapError(err, "failed to list teams")
 	}
 
+	if teams == nil {
+		return nil, "", nil, nil
+	}
+
 	var resources []*v2.Resource
-	for _, team := range teams.Results {
+	for _, team := range *teams.Results {
 		resource, err := newTeamResource(ctx, parentResourceID, team)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create team resource")
@@ -98,7 +102,7 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(len(teams.Results), resourcePageSize) {
+	if isLastPage(len(*teams.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -141,14 +145,18 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		orgId = resource.GetParentResourceId().GetResource()
 	}
 
-	members, _, err := o.client.TeamsApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, _, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, wrapError(err, "failed to list team members")
 	}
 
+	if members == nil {
+		return nil, "", nil, nil
+	}
+
 	var rv []*v2.Grant
-	for _, member := range members.Results {
-		userResource, err := newUserResource(ctx, resource.ParentResourceId, member)
+	for _, member := range *members.Results {
+		userResource, err := newUserResource(ctx, resource.ParentResourceId, &member)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create user resource")
 		}
@@ -156,7 +164,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
-	if isLastPage(len(members.Results), resourcePageSize) {
+	if isLastPage(len(*members.Results), resourcePageSize) {
 		return rv, "", nil, nil
 	}
 
@@ -176,7 +184,8 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
 
 		l.Warn(
-			err.Error(),
+			"mongodb connector: only users can be granted to teams",
+			zap.Error(err),
 			zap.String("principal_id", userId),
 			zap.String("principal_type", principal.Id.ResourceType),
 		)
@@ -202,7 +211,8 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		err := wrapError(err, "failed to add user to team")
 
 		l.Error(
-			err.Error(),
+			"failed to add user to team",
+			zap.Error(err),
 			zap.String("org_id", orgId),
 			zap.String("team_id", teamId),
 			zap.String("user_id", userId),
@@ -222,7 +232,8 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		err := fmt.Errorf("mongodb connector: only users can be removed from teams")
 
 		l.Warn(
-			err.Error(),
+			"mongodb connector: only users can be removed from teams",
+			zap.Error(err),
 			zap.String("principal_id", userId),
 			zap.String("principal_type", grant.Principal.Id.ResourceType),
 		)
@@ -240,7 +251,8 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		err := wrapError(err, "failed to remove user from team")
 
 		l.Error(
-			err.Error(),
+			"failed to remove user from team",
+			zap.Error(err),
 			zap.String("org_id", orgId),
 			zap.String("team_id", teamId),
 			zap.String("user_id", userId),

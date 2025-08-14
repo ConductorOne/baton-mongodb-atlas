@@ -15,7 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
 type databaseUserBuilder struct {
@@ -78,8 +78,12 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		return nil, "", nil, wrapError(err, "failed to list database users")
 	}
 
+	if users.Results == nil {
+		return nil, "", nil, nil
+	}
+
 	var resources []*v2.Resource
-	for _, user := range users.Results {
+	for _, user := range *users.Results {
 		resource, err := newDatabaseUserResource(ctx, parentResourceID, user)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create database user resource")
@@ -88,7 +92,7 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(len(users.Results), resourcePageSize) {
+	if isLastPage(len(*users.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -112,6 +116,8 @@ func (o *databaseUserBuilder) Grants(ctx context.Context, resource *v2.Resource,
 
 func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.CredentialOptions) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
+
+	var err error
 
 	profile := accountInfo.Profile.AsMap()
 
@@ -140,14 +146,38 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
 	}
 
+	var userId string
+
 	if o.createInviteKey {
-		err := o.createUserIfNotExists(ctx, orgId, email, profile)
+		userId, err = o.createUserIfNotExists(ctx, orgId, email, profile)
 		if err != nil {
 			l.Error(
 				"failed to create organization invitation",
 				zap.Error(err),
 			)
 			return nil, nil, nil, err
+		}
+	}
+
+	var user *admin.CloudAppUser
+	if userId != "" {
+		user, _, err = o.client.MongoDBCloudUsersApi.GetUser(ctx, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
+		}
+	} else {
+		user, _, err = o.client.MongoDBCloudUsersApi.GetUserByUsername(ctx, email).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			if atlasErr, ok := admin.AsError(err); ok {
+				switch atlasErr.ErrorCode {
+				case "CANNOT_ADD_PENDING_USER":
+					return nil, nil, nil, fmt.Errorf("the user '%s' has a pending invite in the organization", email)
+				case "NOT_USER_ADMIN":
+					return nil, nil, nil, fmt.Errorf("the user '%s' is not in the organization either received an invite, enable createInviteKey to create the invite", email)
+				}
+			}
+
+			return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", err)
 		}
 	}
 
@@ -166,7 +196,7 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 			Password:     &password,
 			Username:     username,
 			DatabaseName: databaseName,
-			Roles: []admin.DatabaseUserRole{
+			Roles: &[]admin.DatabaseUserRole{
 				{
 					DatabaseName: databaseName,
 					RoleName:     "read",
@@ -182,21 +212,10 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
-	userFromApi, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(
-		ctx,
-		groupId,
-		databaseName,
-		username,
-	).Execute() //nolint:bodyclose // The SDK handles closing the response body
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	resource, err := newDatabaseUserResource(ctx, &v2.ResourceId{
-		ResourceType: projectResourceType.Id,
-		Resource:     groupId,
-	}, *userFromApi)
-
+	resource, err := newUserResource(ctx, &v2.ResourceId{
+		ResourceType: organizationResourceType.Id,
+		Resource:     orgId,
+	}, user)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -218,17 +237,18 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 	return response, plaintextData, nil, err
 }
 
-func parseStrList(strFrom any, defaultValue []string) []string {
+func parseStrList(strFrom any, defaultValue []string) *[]string {
 	str, ok := strFrom.(string)
 	if !ok {
-		return defaultValue
+		return &defaultValue
 	}
 
 	if str == "" {
-		return defaultValue
+		return &defaultValue
 	}
 
-	return strings.Split(strings.TrimSpace(str), ",")
+	temp := strings.Split(strings.TrimSpace(str), ",")
+	return &temp
 }
 
 func (o *databaseUserBuilder) CreateAccountCapabilityDetails(ctx context.Context) (*v2.CredentialDetailsAccountProvisioning, annotations.Annotations, error) {
@@ -240,31 +260,37 @@ func (o *databaseUserBuilder) CreateAccountCapabilityDetails(ctx context.Context
 	}, nil, nil
 }
 
-func (o *databaseUserBuilder) createUserIfNotExists(ctx context.Context, orgId, email string, profile map[string]any) error {
+func (o *databaseUserBuilder) createUserIfNotExists(ctx context.Context, orgId, email string, profile map[string]any) (string, error) {
 	l := ctxzap.Extract(ctx)
 
-	_, httpResponse, err := o.client.OrganizationsApi.CreateOrganizationInvitation(
+	userInvite, httpResponse, err := o.client.MongoDBCloudUsersApi.CreateOrganizationUser(
 		ctx,
 		orgId,
-		&admin.OrganizationInvitationRequest{
-			Username:             &email,
-			Roles:                parseStrList(profile["roles"], []string{"ORG_MEMBER"}),
-			TeamIds:              parseStrList(profile["teamIds"], []string{}),
-			GroupRoleAssignments: nil,
+		&admin.OrgUserRequest{
+			Username: email,
+			Roles: admin.OrgUserRolesRequest{
+				OrgRoles:             *parseStrList(profile["roles"], []string{"ORG_MEMBER"}),
+				GroupRoleAssignments: &[]admin.GroupRoleAssignment{},
+			},
+			TeamIds: parseStrList(profile["teamIds"], []string{}),
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
 		if httpResponse != nil && httpResponse.StatusCode == http.StatusConflict {
-			l.Info("user already exists, skipping creation", zap.String("email", email))
-			return nil
+			l.Info(
+				"user already exists, skipping creation",
+				zap.String("email", email),
+				zap.String("orgId", orgId),
+			)
+			return "", nil
 		}
 		l.Error(
 			"failed to create organization invitation",
 			zap.Error(err),
 		)
-		return err
+		return "", fmt.Errorf("failed to create organization invitation: %w", err)
 	}
 
-	return nil
+	return userInvite.Id, nil
 }
