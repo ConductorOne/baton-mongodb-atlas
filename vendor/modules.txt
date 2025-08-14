@@ -353,7 +353,7 @@ github.com/maypok86/otter/internal/xruntime
 # github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
-# github.com/mongodb-forks/digest v1.0.5
+# github.com/mongodb-forks/digest v1.1.0
 ## explicit; go 1.20
 github.com/mongodb-forks/digest
 # github.com/ncruces/go-strftime v0.1.9
@@ -458,10 +458,12 @@ github.com/tklauser/numcpus
 # github.com/yusufpapurcu/wmi v1.2.4
 ## explicit; go 1.16
 github.com/yusufpapurcu/wmi
-# go.mongodb.org/atlas-sdk/v20231001002 v20231001002.0.0
-## explicit; go 1.20
-go.mongodb.org/atlas-sdk/v20231001002/admin
-go.mongodb.org/atlas-sdk/v20231001002/internal/core
+# go.mongodb.org/atlas-sdk/v20250312006 v20250312006.0.0
+## explicit; go 1.23.0
+go.mongodb.org/atlas-sdk/v20250312006/admin
+go.mongodb.org/atlas-sdk/v20250312006/auth
+go.mongodb.org/atlas-sdk/v20250312006/auth/clientcredentials
+go.mongodb.org/atlas-sdk/v20250312006/internal/core
 # go.opentelemetry.io/auto/sdk v1.1.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
@@ -587,8 +589,8 @@ golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.26.0
-## explicit; go 1.18
+# golang.org/x/oauth2 v0.30.0
+## explicit; go 1.23.0
 golang.org/x/oauth2
 golang.org/x/oauth2/clientcredentials
 golang.org/x/oauth2/internal
