@@ -149,6 +149,7 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 	var userId string
 
 	if o.createInviteKey {
+		l.Info("creating organization user")
 		userId, err = o.createUserIfNotExists(ctx, orgId, email, profile)
 		if err != nil {
 			l.Error(
@@ -159,9 +160,11 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		}
 	}
 
-	var user *admin.CloudAppUser
+	l.Info("creating database user", zap.String("userId", userId))
+
+	var user atlasUserResponse
 	if userId != "" {
-		user, _, err = o.client.MongoDBCloudUsersApi.GetUser(ctx, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		user, _, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
 		}
@@ -212,10 +215,14 @@ func (o *databaseUserBuilder) CreateAccount(ctx context.Context, accountInfo *v2
 		return nil, nil, nil, err
 	}
 
-	resource, err := newUserResource(ctx, &v2.ResourceId{
-		ResourceType: organizationResourceType.Id,
-		Resource:     orgId,
-	}, user)
+	resource, err := newUserResource(
+		ctx,
+		&v2.ResourceId{
+			ResourceType: organizationResourceType.Id,
+			Resource:     orgId,
+		},
+		user,
+	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
