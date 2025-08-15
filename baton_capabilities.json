@@ -16,8 +16,7 @@
         "description":  "A MongoDB Atlas Database User"
       },
       "capabilities":  [
-        "CAPABILITY_SYNC",
-        "CAPABILITY_ACCOUNT_PROVISIONING"
+        "CAPABILITY_SYNC"
       ]
     },
     {
@@ -91,7 +90,8 @@
         "description":  "A MongoDB Atlas Organization User"
       },
       "capabilities":  [
-        "CAPABILITY_SYNC"
+        "CAPABILITY_SYNC",
+        "CAPABILITY_ACCOUNT_PROVISIONING"
       ]
     }
   ],
