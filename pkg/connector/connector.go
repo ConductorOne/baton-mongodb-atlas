@@ -7,7 +7,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
 type MongoDB struct {
@@ -19,10 +19,10 @@ type MongoDB struct {
 func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
 		newOrganizationBuilder(d.client),
-		newUserBuilder(d.client),
+		newUserBuilder(d.client, d.createInviteKey),
 		newTeamBuilder(d.client),
 		newProjectBuilder(d.client),
-		newDatabaseUserBuilder(d.client, d.createInviteKey),
+		newDatabaseUserBuilder(d.client),
 		newMongoClusterBuilder(d.client),
 	}
 }

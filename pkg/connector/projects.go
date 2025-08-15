@@ -11,7 +11,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
 )
 
@@ -112,8 +112,12 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		return nil, "", nil, err
 	}
 
+	if projects == nil {
+		return nil, "", nil, nil
+	}
+
 	var resources []*v2.Resource
-	for _, project := range projects.Results {
+	for _, project := range *projects.Results {
 		resource, err := newProjectResource(ctx, parentResourceID, project)
 		if err != nil {
 			return nil, "", nil, err
@@ -122,7 +126,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(len(projects.Results), resourcePageSize) {
+	if isLastPage(len(*projects.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -153,7 +157,6 @@ func (p *projectBuilder) Entitlements(_ context.Context, resource *v2.Resource, 
 		ent.WithGrantableTo(databaseUserResourceType),
 		ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
 		ent.WithDisplayName(fmt.Sprintf("%s team %s", resource.DisplayName, memberEntitlement)),
-		ent.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 
 	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
@@ -207,37 +210,30 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 }
 
 func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, _, err := p.client.ProjectsApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, _, err := p.client.MongoDBCloudUsersApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list project users")
 	}
 
+	if members.Results == nil {
+		return nil, 0, err
+	}
+
 	var rv []*v2.Grant
-	for _, member := range members.Results {
-		userResource, err := newUserResource(ctx, resource.ParentResourceId, member)
+	for _, member := range *members.Results {
+		userResource, err := newUserResource(ctx, resource.ParentResourceId, &member)
 		if err != nil {
 			return nil, *members.TotalCount, wrapError(err, "failed to create user resource")
 		}
 
-		for _, role := range member.Roles {
-			if role.GroupId == nil {
-				continue
-			}
-
-			roleProjectId := *role.GroupId
-			if roleProjectId != resource.Id.Resource {
-				continue
-			}
-
-			roleName := role.RoleName
-
-			if entitlement, ok := userRolesProjectEntitlementMap[*roleName]; ok {
+		for _, roleName := range member.Roles {
+			if entitlement, ok := userRolesProjectEntitlementMap[roleName]; ok {
 				rv = append(rv, grant.NewGrant(resource, entitlement, userResource.Id))
 			}
 		}
 	}
 
-	return rv, len(members.Results), nil
+	return rv, len(*members.Results), nil
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -246,8 +242,12 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 		return nil, 0, wrapError(err, "failed to list project database users")
 	}
 
+	if members.Results == nil {
+		return nil, 0, err
+	}
+
 	var rv []*v2.Grant
-	for _, member := range members.Results {
+	for _, member := range *members.Results {
 		userResource, err := newDatabaseUserResource(ctx, resource.ParentResourceId, member)
 		if err != nil {
 			return nil, *members.TotalCount, wrapError(err, "failed to create database user resource")
@@ -256,17 +256,19 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
-	return rv, len(members.Results), nil
+	return rv, len(*members.Results), nil
 }
 
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	if principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be granted to projects")
+	if principal.Id.ResourceType != userResourceType.Id &&
+		principal.Id.ResourceType != databaseUserResourceType.Id {
+		err := fmt.Errorf("mongodb connector: only users can be granted to projects: %s", principal.Id.ResourceType)
 
 		l.Warn(
-			err.Error(),
+			"mongodb connector: only users can be granted to projects",
+			zap.Error(err),
 			zap.String("principal_id", principal.Id.Resource),
 			zap.String("principal_type", principal.Id.ResourceType),
 		)
@@ -274,9 +276,9 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		return nil, err
 	}
 
-	user, _, err := p.client.MongoDBCloudUsersApi.GetUser(ctx, principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	trait, err := rs.GetUserTrait(principal)
 	if err != nil {
-		return nil, wrapError(err, "failed to get user")
+		return nil, err
 	}
 
 	var entitlementSlug string
@@ -284,7 +286,8 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		err := fmt.Errorf("mongodb connector: unknown entitlement %s", entitlement.Slug)
 
 		l.Warn(
-			err.Error(),
+			"mongodb connector: unknown entitlement",
+			zap.Error(err),
 			zap.String("entitlement_slug", entitlement.Slug),
 		)
 
@@ -293,19 +296,21 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		entitlementSlug = slug
 	}
 
+	username := trait.GetLogin()
 	_, _, err = p.client.ProjectsApi.AddUserToProject(
 		ctx,
 		entitlement.Resource.Id.Resource,
 		&admin.GroupInvitationRequest{
-			Username: &user.Username,
-			Roles:    []string{entitlementSlug},
+			Username: &username,
+			Roles:    &[]string{entitlementSlug},
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to add user to project")
 
 		l.Error(
-			err.Error(),
+			"failed to add user to project",
+			zap.Error(err),
 			zap.String("user_id", principal.Id.Resource),
 			zap.String("project_id", entitlement.Resource.Id.Resource),
 		)
@@ -323,7 +328,8 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		err := fmt.Errorf("mongodb connector: only users can be revoked from projects")
 
 		l.Warn(
-			err.Error(),
+			"mongodb connector: only users can be revoked from projects",
+			zap.Error(err),
 			zap.String("principal_id", grant.Principal.Id.Resource),
 			zap.String("principal_type", grant.Principal.Id.ResourceType),
 		)
@@ -331,12 +337,13 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	_, err := p.client.ProjectsApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	_, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to remove user from project")
 
 		l.Error(
-			err.Error(),
+			"failed to remove user from project",
+			zap.Error(err),
 			zap.String("user_id", grant.Principal.Id.Resource),
 			zap.String("project_id", grant.Entitlement.Resource.Id.Resource),
 		)

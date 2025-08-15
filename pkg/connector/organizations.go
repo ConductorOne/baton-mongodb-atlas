@@ -10,7 +10,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
 var (
@@ -72,8 +72,12 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		return nil, "", nil, wrapError(err, "failed to list organizations")
 	}
 
+	if organizations.Results == nil {
+		return nil, "", nil, nil
+	}
+
 	var resources []*v2.Resource
-	for _, organization := range organizations.Results {
+	for _, organization := range *organizations.Results {
 		resource, err := newOrganizationResource(organization)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create organization resource")
@@ -82,7 +86,7 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		resources = append(resources, resource)
 	}
 
-	if isLastPage(len(organizations.Results), resourcePageSize) {
+	if isLastPage(len(*organizations.Results), resourcePageSize) {
 		return resources, "", nil, nil
 	}
 
@@ -197,8 +201,12 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 		return nil, 0, wrapError(err, "failed to list teams")
 	}
 
+	if teams.Results == nil {
+		return nil, 0, err
+	}
+
 	var rv []*v2.Grant
-	for _, team := range teams.Results {
+	for _, team := range *teams.Results {
 		teamResource, err := newTeamResource(ctx, orgResource.Id, team)
 		if err != nil {
 			return nil, *teams.TotalCount, wrapError(err, "failed to create team grant")
@@ -213,7 +221,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 		rv = append(rv, g)
 	}
 
-	return rv, len(teams.Results), nil
+	return rv, len(*teams.Results), nil
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
@@ -222,8 +230,12 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 		return nil, 0, wrapError(err, "failed to list projects")
 	}
 
+	if projects.Results == nil {
+		return nil, 0, err
+	}
+
 	var rv []*v2.Grant
-	for _, project := range projects.Results {
+	for _, project := range *projects.Results {
 		if project.OrgId != orgResource.Id.Resource {
 			continue
 		}
@@ -249,40 +261,34 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 		rv = append(rv, g)
 	}
 
-	return rv, len(projects.Results), nil
+	return rv, len(*projects.Results), nil
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	users, _, err := o.client.OrganizationsApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, wrapError(err, "failed to list organization users")
 	}
 
+	if users.Results == nil {
+		return nil, 0, err
+	}
+
 	var rv []*v2.Grant
-	for _, user := range users.Results {
-		userResource, err := newUserResource(ctx, orgResource.Id, user)
+	for _, user := range *users.Results {
+		userResource, err := newUserResource(ctx, orgResource.Id, &user)
 		if err != nil {
 			return nil, *users.TotalCount, wrapError(err, "failed to create user resource")
 		}
 
-		for _, role := range user.Roles {
-			if role.OrgId == nil {
-				continue
-			}
-
-			roleOrgId := *role.OrgId
-			if roleOrgId != orgResource.Id.Resource {
-				continue
-			}
-
-			roleName := role.RoleName
-			if entitlement, ok := userRolesOrganizationEntitlementMap[*roleName]; ok {
-				rv = append(rv, grant.NewGrant(orgResource, entitlement, userResource.Id))
+		for _, roleName := range *user.Roles.OrgRoles {
+			if entitlementTarget, ok := userRolesOrganizationEntitlementMap[roleName]; ok {
+				rv = append(rv, grant.NewGrant(orgResource, entitlementTarget, userResource.Id))
 			}
 		}
 	}
 
-	return rv, len(users.Results), nil
+	return rv, len(*users.Results), nil
 }
 
 func newOrganizationBuilder(client *admin.APIClient) *organizationBuilder {

@@ -10,7 +10,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
-	"go.mongodb.org/atlas-sdk/v20231001002/admin"
+	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
 type mongoClusterBuilder struct {
@@ -69,7 +69,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	}
 
 	nextPage := ""
-	if len(response.Results) != 0 {
+	if response.Results == nil || len(*response.Results) != 0 {
 		nextPage = strconv.Itoa(currentPage + 1)
 	}
 
@@ -77,7 +77,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 }
 
 func newMongoClusterResource(
-	cluster admin.AdvancedClusterDescription,
+	cluster admin.ClusterDescription20240805,
 	parentId *v2.ResourceId,
 ) (*v2.Resource, error) {
 	profile := map[string]interface{}{
