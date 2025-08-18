@@ -3,6 +3,10 @@ package connector
 import (
 	"context"
 	"fmt"
+	"net/http"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -22,7 +26,8 @@ var (
 		"ORG_READ_ONLY":         readOnlyEntitlement,
 		"ORG_MEMBER":            memberEntitlement,
 	}
-	organizationUserEntitlements = []string{
+	userRolesOrganizationEntitlementMapReversed = reverseMap(userRolesOrganizationEntitlementMap)
+	organizationUserEntitlements                = []string{
 		ownerEntitlement,
 		projectCreatorEntitlement,
 		billingAdminEntitlement,
@@ -115,6 +120,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(teamResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, memberEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent := entitlement.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -123,6 +129,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(databaseUserResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -131,6 +138,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(projectResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Part of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -195,6 +203,89 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	return rv, nextPage, nil, nil
 }
 
+func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
+	if resource.Id.ResourceType != userResourceType.Id {
+		return nil, nil, fmt.Errorf("baton-mongodb-atlas: cannot grant to resource type %s", resource.Id.ResourceType)
+	}
+
+	orgId := entitlement.Resource.Id.Resource
+	userTrait, err := rs.GetUserTrait(resource)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-mongodb-atlas: cannot get trait from user: %w", err)
+	}
+
+	emails := userTrait.GetEmails()
+	var primaryEmail string
+	for _, email := range emails {
+		if email.IsPrimary {
+			primaryEmail = email.GetAddress()
+			break
+		}
+	}
+
+	if primaryEmail == "" {
+		return nil, nil, fmt.Errorf("baton-mongodb-atlas: no primary email found for user %s", resource.Id.Resource)
+	}
+
+	role := userRolesOrganizationEntitlementMapReversed[entitlement.Slug]
+
+	response, httpResponse, err := o.client.MongoDBCloudUsersApi.CreateOrganizationUser(
+		ctx,
+		orgId,
+		&admin.OrgUserRequest{
+			Username: primaryEmail,
+			Roles: admin.OrgUserRolesRequest{
+				OrgRoles:             []string{role},
+				GroupRoleAssignments: &[]admin.GroupRoleAssignment{},
+			},
+			TeamIds: &[]string{},
+		},
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+
+	if err != nil {
+		if httpResponse != nil && httpResponse.StatusCode == http.StatusConflict {
+			l.Info(
+				"user already exists, skipping creation",
+				zap.String("email", primaryEmail),
+				zap.String("orgId", orgId),
+			)
+			return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
+
+		return nil, nil, err
+	}
+
+	newGrant := grant.NewGrant(resource, entitlement.Slug, &v2.ResourceId{
+		ResourceType: userResourceType.Id,
+		Resource:     response.Id,
+	})
+
+	return []*v2.Grant{newGrant}, nil, nil
+}
+
+func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	if grant.Principal.Id.ResourceType != userResourceType.Id {
+		return nil, fmt.Errorf("baton-mongodb-atlas: cannot revoke to resource type %s", grant.Principal.Id.ResourceType)
+	}
+
+	orgId := grant.Entitlement.Resource.Id.Resource
+	userId := grant.Principal.Id.Resource
+
+	_, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(
+		ctx,
+		orgId,
+		userId,
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+
+	if err != nil {
+		return nil, wrapError(err, "failed to remove organization user")
+	}
+
+	return nil, nil
+}
+
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
@@ -216,6 +307,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 			orgResource,
 			memberEntitlement,
 			teamResource.Id,
+			grant.WithAnnotation(&v2.GrantImmutable{}),
 		)
 
 		rv = append(rv, g)
@@ -255,6 +347,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 					Shallow:         true,
 					ResourceTypeIds: []string{databaseUserResourceType.Id},
 				},
+				&v2.GrantImmutable{},
 			),
 		)
 
@@ -283,7 +376,14 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Re
 
 		for _, roleName := range *user.Roles.OrgRoles {
 			if entitlementTarget, ok := userRolesOrganizationEntitlementMap[roleName]; ok {
-				rv = append(rv, grant.NewGrant(orgResource, entitlementTarget, userResource.Id))
+				rv = append(
+					rv,
+					grant.NewGrant(
+						orgResource,
+						entitlementTarget,
+						userResource.Id,
+					),
+				)
 			}
 		}
 	}
