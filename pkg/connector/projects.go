@@ -16,26 +16,21 @@ import (
 )
 
 var (
+	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-addprojectuser#operation-addprojectuser-body-application-vnd-atlas-2025-02-19-json-roles
 	userRolesProjectEntitlementMap = map[string]string{
-		"GROUP_OWNER":                  ownerEntitlement,
-		"GROUP_CLUSTER_MANAGER":        clusterManagerEntitlement,
-		"GROUP_DATA_ACCESS_ADMIN":      dataAccessAdminEntitlement,
-		"GROUP_DATA_ACCESS_READ_WRITE": dataAccessReadAndWriteEntitlement,
-		"GROUP_DATA_ACCESS_READ_ONLY":  dataAccessReadOnlyEntitlement,
-		"GROUP_READ_ONLY":              readOnlyEntitlement,
-		"GROUP_SEARCH_INDEX_EDITOR":    searchIndexEditorEntitlement,
+		"GROUP_OWNER":                   ownerEntitlement,
+		"GROUP_CLUSTER_MANAGER":         clusterManagerEntitlement,
+		"GROUP_STREAM_PROCESSING_OWNER": groupStreamProcessingOwnerEntitlement,
+		"GROUP_DATA_ACCESS_ADMIN":       dataAccessAdminEntitlement,
+		"GROUP_DATA_ACCESS_READ_WRITE":  dataAccessReadAndWriteEntitlement,
+		"GROUP_DATA_ACCESS_READ_ONLY":   dataAccessReadOnlyEntitlement,
+		"GROUP_READ_ONLY":               readOnlyEntitlement,
+		"GROUP_SEARCH_INDEX_EDITOR":     searchIndexEditorEntitlement,
+		"GROUP_BACKUP_MANAGER":          groupBackupManagerEntitlement,
+		"GROUP_OBSERVABILITY_VIEWER":    groupObservabilityViewerEntitlement,
+		"GROUP_DATABASE_ACCESS_ADMIN":   groupDatabaseAccessAdminEntitlement,
 	}
 	projectEntitlementsUserRolesMap = reverseMap(userRolesProjectEntitlementMap)
-	projectUserEntitlements         = []string{
-		ownerEntitlement,
-		clusterManagerEntitlement,
-		dataAccessAdminEntitlement,
-		dataAccessReadAndWriteEntitlement,
-		dataAccessReadOnlyEntitlement,
-		readOnlyEntitlement,
-		searchIndexEditorEntitlement,
-		memberEntitlement,
-	}
 )
 
 type projectBuilder struct {
@@ -142,7 +137,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 func (p *projectBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 
-	for _, e := range projectUserEntitlements {
+	for _, e := range userRolesProjectEntitlementMap {
 		assigmentOptions := []ent.EntitlementOption{
 			ent.WithGrantableTo(userResourceType),
 			ent.WithDescription(fmt.Sprintf("Member of %s team", resource.DisplayName)),
@@ -297,12 +292,12 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 	}
 
 	username := trait.GetLogin()
-	_, _, err = p.client.ProjectsApi.AddUserToProject(
+	_, _, err = p.client.MongoDBCloudUsersApi.AddProjectUser(
 		ctx,
 		entitlement.Resource.Id.Resource,
-		&admin.GroupInvitationRequest{
-			Username: &username,
-			Roles:    &[]string{entitlementSlug},
+		&admin.GroupUserRequest{
+			Username: username,
+			Roles:    []string{entitlementSlug},
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
