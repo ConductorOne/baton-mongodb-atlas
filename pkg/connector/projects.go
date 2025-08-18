@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-addprojectrole#operation-addprojectrole-200-body-application-vnd-atlas-2025-02-19-json-roles
+	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-addprojectuser#operation-addprojectuser-body-application-vnd-atlas-2025-02-19-json-roles
 	userRolesProjectEntitlementMap = map[string]string{
 		"GROUP_OWNER":                   ownerEntitlement,
 		"GROUP_CLUSTER_MANAGER":         clusterManagerEntitlement,
