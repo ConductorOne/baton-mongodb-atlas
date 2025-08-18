@@ -146,11 +146,6 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("groupId is empty")
 	}
 
-	databaseName, ok := profile["databaseName"].(string)
-	if databaseName == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("databaseName is empty")
-	}
-
 	username, ok := profile["username"].(string)
 	if username == "" || !ok {
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
@@ -214,6 +209,8 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		return nil, nil, nil, err
 	}
 
+	defaultDatabase := "admin"
+
 	// TODO(golds): Needs to support more usernames
 	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-createdatabaseuser#operation-createdatabaseuser-body-application-vnd-atlas-2023-01-01-json-username
 	_, _, err = o.client.DatabaseUsersApi.CreateDatabaseUser(
@@ -223,10 +220,10 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			GroupId:      groupId,
 			Password:     &password,
 			Username:     username,
-			DatabaseName: databaseName,
+			DatabaseName: defaultDatabase,
 			Roles: &[]admin.DatabaseUserRole{
 				{
-					DatabaseName: databaseName,
+					DatabaseName: defaultDatabase,
 					RoleName:     "read",
 				},
 			},

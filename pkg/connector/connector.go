@@ -99,15 +99,6 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 					},
 					Order: 6,
 				},
-				"databaseName": {
-					DisplayName: "Database Name",
-					Required:    true,
-					Description: "The name of the database to which the user will have access.",
-					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
-						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
-					},
-					Order: 7,
-				},
 			},
 		},
 	}, nil
