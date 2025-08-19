@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 
