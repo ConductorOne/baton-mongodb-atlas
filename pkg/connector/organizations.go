@@ -3,6 +3,8 @@ package connector
 import (
 	"context"
 	"fmt"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -273,6 +275,8 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 }
 
 func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
 		return nil, fmt.Errorf("baton-mongodb-atlas: cannot revoke to resource type %s", grant.Principal.Id.ResourceType)
 	}
@@ -304,18 +308,28 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 	}
 
-	_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
-		ctx,
-		orgId,
-		userId,
-		&admin.OrgUserUpdateRequest{
-			Roles: &admin.OrgUserRolesRequest{
-				OrgRoles:             newRoles,
-				GroupRoleAssignments: response.Roles.GroupRoleAssignments,
+	if len(newRoles) == 0 {
+		l.Info(
+			"baton-mongodb-atlas: no roles to assign to user, removing from org",
+			zap.String("orgId", orgId),
+			zap.String("userId", userId),
+		)
+
+		_, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	} else {
+		_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
+			ctx,
+			orgId,
+			userId,
+			&admin.OrgUserUpdateRequest{
+				Roles: &admin.OrgUserRolesRequest{
+					OrgRoles:             newRoles,
+					GroupRoleAssignments: response.Roles.GroupRoleAssignments,
+				},
+				TeamIds: response.TeamIds,
 			},
-			TeamIds: response.TeamIds,
-		},
-	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	}
 
 	if err != nil {
 		return nil, wrapError(err, "failed to remove user role for organization user")
