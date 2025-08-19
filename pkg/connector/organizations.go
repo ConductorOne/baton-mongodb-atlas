@@ -3,10 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"net/http"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -15,6 +11,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -204,16 +202,15 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 }
 
 func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
-	l := ctxzap.Extract(ctx)
-
 	if resource.Id.ResourceType != userResourceType.Id {
 		return nil, nil, fmt.Errorf("baton-mongodb-atlas: cannot grant to resource type %s", resource.Id.ResourceType)
 	}
 
 	orgId := entitlement.Resource.Id.Resource
+	userId := resource.Id.Resource
 	userTrait, err := rs.GetUserTrait(resource)
 	if err != nil {
-		return nil, nil, fmt.Errorf("baton-mongodb-atlas: cannot get trait from user: %w", err)
+		return nil, nil, status.Errorf(codes.FailedPrecondition, "baton-mongodb-atlas: resource %s does not have a user trait", userId)
 	}
 
 	emails := userTrait.GetEmails()
@@ -226,40 +223,50 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 	}
 
 	if primaryEmail == "" {
-		return nil, nil, fmt.Errorf("baton-mongodb-atlas: no primary email found for user %s", resource.Id.Resource)
+		return nil, nil, status.Errorf(codes.FailedPrecondition, "baton-mongodb-atlas: no primary email found for user %s", userId)
 	}
 
 	role := userRolesOrganizationEntitlementMapReversed[entitlement.Slug]
 
-	response, httpResponse, err := o.client.MongoDBCloudUsersApi.CreateOrganizationUser(
+	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, nil, status.Errorf(codes.NotFound, "baton-mongodb-atlas: user %s not found in organization %s", userId, orgId)
+	}
+
+	var newRoles []string
+
+	if response.Roles.OrgRoles != nil {
+		for _, s := range *response.Roles.OrgRoles {
+			if s == role {
+				return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
+			}
+		}
+
+		newRoles = append(newRoles, *response.Roles.OrgRoles...)
+	}
+
+	newRoles = append(newRoles, role)
+
+	_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
 		ctx,
 		orgId,
-		&admin.OrgUserRequest{
-			Username: primaryEmail,
-			Roles: admin.OrgUserRolesRequest{
-				OrgRoles:             []string{role},
-				GroupRoleAssignments: &[]admin.GroupRoleAssignment{},
+		userId,
+		&admin.OrgUserUpdateRequest{
+			Roles: &admin.OrgUserRolesRequest{
+				OrgRoles:             newRoles,
+				GroupRoleAssignments: response.Roles.GroupRoleAssignments,
 			},
-			TeamIds: &[]string{},
+			TeamIds: response.TeamIds,
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
-		if httpResponse != nil && httpResponse.StatusCode == http.StatusConflict {
-			l.Info(
-				"user already exists, skipping creation",
-				zap.String("email", primaryEmail),
-				zap.String("orgId", orgId),
-			)
-			return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
-		}
-
 		return nil, nil, err
 	}
 
 	newGrant := grant.NewGrant(resource, entitlement.Slug, &v2.ResourceId{
 		ResourceType: userResourceType.Id,
-		Resource:     response.Id,
+		Resource:     userId,
 	})
 
 	return []*v2.Grant{newGrant}, nil, nil
@@ -272,15 +279,46 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 
 	orgId := grant.Entitlement.Resource.Id.Resource
 	userId := grant.Principal.Id.Resource
+	role := userRolesOrganizationEntitlementMapReversed[grant.Entitlement.Slug]
 
-	_, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(
+	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "baton-mongodb-atlas: user %s not found in organization %s", userId, orgId)
+	}
+
+	if response.Roles.OrgRoles == nil {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+
+	var newRoles []string
+
+	for _, s := range *response.Roles.OrgRoles {
+		if s == role {
+			continue
+		}
+
+		newRoles = append(newRoles, s)
+	}
+
+	if len(newRoles) == len(*response.Roles.OrgRoles) {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+
+	_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
 		ctx,
 		orgId,
 		userId,
+		&admin.OrgUserUpdateRequest{
+			Roles: &admin.OrgUserRolesRequest{
+				OrgRoles:             newRoles,
+				GroupRoleAssignments: response.Roles.GroupRoleAssignments,
+			},
+			TeamIds: response.TeamIds,
+		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
-		return nil, wrapError(err, "failed to remove organization user")
+		return nil, wrapError(err, "failed to remove user role for organization user")
 	}
 
 	return nil, nil
