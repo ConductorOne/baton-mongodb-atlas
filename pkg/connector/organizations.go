@@ -233,7 +233,7 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 
 	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, status.Errorf(codes.NotFound, "baton-mongodb-atlas: user %s not found in organization %s", userId, orgId)
+		return nil, nil, err
 	}
 
 	var newRoles []string
@@ -288,7 +288,7 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 
 	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "baton-mongodb-atlas: user %s not found in organization %s", userId, orgId)
+		return nil, err
 	}
 
 	if response.Roles.OrgRoles == nil {
