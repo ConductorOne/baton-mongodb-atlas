@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/crypto"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
+	"go.uber.org/zap"
 )
 
 type atlasUserResponse interface {
@@ -154,6 +154,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	var userId string
 
+	var user atlasUserResponse
 	if o.createInviteKey {
 		l.Info("creating organization user")
 		userId, err = o.createUserIfNotExists(ctx, orgId, email, profile)
@@ -164,47 +165,43 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			)
 			return nil, nil, nil, err
 		}
-	}
 
-	l.Info("creating database user", zap.String("userId", userId))
+		if userId != "" {
+			user, _, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
+			}
+		} else {
+			response, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgId).Username(email).Execute() //nolint:bodyclose // The SDK handles closing the response body
+			if err != nil {
+				if atlasErr, ok := admin.AsError(err); ok {
+					switch atlasErr.ErrorCode {
+					case "CANNOT_ADD_PENDING_USER":
+						return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' has a pending invite in the organization", email))
+					case "NOT_USER_ADMIN":
+						return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' is not in the organization either received an invite, enable createInviteKey to create the invite", email))
+					}
+				}
 
-	var user atlasUserResponse
-	if userId != "" {
-		user, _, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
-		}
-	} else {
-		response, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgId).Username(email).Execute() //nolint:bodyclose // The SDK handles closing the response body
-		if err != nil {
-			if atlasErr, ok := admin.AsError(err); ok {
-				switch atlasErr.ErrorCode {
-				case "CANNOT_ADD_PENDING_USER":
-					return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' has a pending invite in the organization", email))
-				case "NOT_USER_ADMIN":
-					return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' is not in the organization either received an invite, enable createInviteKey to create the invite", email))
+				return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", err)
+			}
+
+			if response.Results == nil {
+				return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
+			}
+
+			for _, userResponse := range *response.Results {
+				if userResponse.GetUsername() == email {
+					user = &userResponse
+					break
 				}
 			}
 
-			return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", err)
-		}
-
-		if response.Results == nil {
-			return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
-		}
-
-		for _, userResponse := range *response.Results {
-			if userResponse.GetUsername() == email {
-				user = &userResponse
-				break
-			}
-		}
-
-		if user == nil {
-			return nil, nil, nil, fmt.Errorf("user '%s' not found", email)
+			l.Info("user were not found by username, creating database user instead", zap.String("email", email))
 		}
 	}
 
+	l.Info("creating database user", zap.String("userId", userId))
 	password, err := crypto.GeneratePassword(credentialOptions)
 	if err != nil {
 		return nil, nil, nil, err
@@ -214,7 +211,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	// TODO(golds): Needs to support more usernames
 	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-createdatabaseuser#operation-createdatabaseuser-body-application-vnd-atlas-2023-01-01-json-username
-	_, _, err = o.client.DatabaseUsersApi.CreateDatabaseUser(
+	dbUser, _, err := o.client.DatabaseUsersApi.CreateDatabaseUser(
 		ctx,
 		groupId,
 		&admin.CloudDatabaseUser{
@@ -238,16 +235,28 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		return nil, nil, nil, err
 	}
 
-	resource, err := newUserResource(
-		ctx,
-		&v2.ResourceId{
-			ResourceType: organizationResourceType.Id,
-			Resource:     orgId,
-		},
-		user,
-	)
-	if err != nil {
-		return nil, nil, nil, err
+	var resource *v2.Resource
+	if user != nil {
+		resource, err = newUserResource(
+			ctx,
+			&v2.ResourceId{
+				ResourceType: organizationResourceType.Id,
+				Resource:     orgId,
+			},
+			user,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	} else {
+		resource, err = newDatabaseUserResource(
+			ctx,
+			&v2.ResourceId{
+				ResourceType: projectResourceType.Id,
+				Resource:     groupId,
+			},
+			*dbUser,
+		)
 	}
 
 	response := &v2.CreateAccountResponse_SuccessResult{
