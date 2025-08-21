@@ -14,23 +14,29 @@ import (
 )
 
 type MongoDB struct {
-	client          *admin.APIClient
-	createInviteKey bool
-	mongodriver     *mongodriver.MongoDriver
+	client            *admin.APIClient
+	createInviteKey   bool
+	mongodriver       *mongodriver.MongoDriver
+	enableMongoDriver bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	return []connectorbuilder.ResourceSyncer{
+	builders := []connectorbuilder.ResourceSyncer{
 		newOrganizationBuilder(d.client),
 		newUserBuilder(d.client, d.createInviteKey),
 		newTeamBuilder(d.client),
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
 		newMongoClusterBuilder(d.client),
-		newDatabaseBuilder(d.client, d.mongodriver),
-		newCollectionBuilder(d.client, d.mongodriver),
+		newDatabaseBuilder(d.client, d.mongodriver, d.enableMongoDriver),
 	}
+
+	if d.enableMongoDriver {
+		builders = append(builders, newCollectionBuilder(d.client, d.mongodriver))
+	}
+
+	return builders
 }
 
 // Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
@@ -117,15 +123,16 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey bool) (*MongoDB, error) {
+func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableMongoDriver bool) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err
 	}
 
 	return &MongoDB{
-		client:          client,
-		createInviteKey: createInviteKey,
-		mongodriver:     mongodriver.NewMongoDriver(client, time.Minute*30),
+		client:            client,
+		createInviteKey:   createInviteKey,
+		mongodriver:       mongodriver.NewMongoDriver(client, time.Minute*30),
+		enableMongoDriver: enableMongoDriver,
 	}, nil
 }

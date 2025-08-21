@@ -42,7 +42,8 @@ func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, e
 	publicKey := v.GetString("public-key")
 	privateKey := v.GetString("private-key")
 	createInviteKey := v.GetBool("create-invite-key")
-	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey)
+	enableMongoDriver := v.GetBool("enable-mongo-driver")
+	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey, enableMongoDriver)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
