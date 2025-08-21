@@ -98,7 +98,7 @@ func newCollectionResource(
 	id := fmt.Sprintf("%s/%s/%s/%s", groupID, clusterName, dbName, collectionName)
 
 	resource, err := rs.NewAppResource(
-		fmt.Sprintf("%s - %s", dbName, collectionName),
+		fmt.Sprintf("%s - %s - %s", clusterName, dbName, collectionName),
 		collectionResourceType,
 		id,
 		nil,

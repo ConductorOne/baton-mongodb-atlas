@@ -100,7 +100,7 @@ func newDatabaseResource(
 	id := fmt.Sprintf("%s/%s/%s", groupID, clusterName, db.Name)
 
 	resource, err := rs.NewAppResource(
-		id,
+		fmt.Sprintf("%s - %s", clusterName, db.Name),
 		databaseResourceType,
 		id,
 		appTraits,
