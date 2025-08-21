@@ -44,7 +44,8 @@
         "description":  "A MongoDB Atlas Organization"
       },
       "capabilities":  [
-        "CAPABILITY_SYNC"
+        "CAPABILITY_SYNC",
+        "CAPABILITY_PROVISION"
       ]
     },
     {
