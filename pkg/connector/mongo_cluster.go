@@ -18,7 +18,7 @@ type mongoClusterBuilder struct {
 }
 
 func (o *mongoClusterBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
-	return mongoClusterUserResourceType
+	return mongoClusterResourceType
 }
 
 func newMongoClusterBuilder(client *admin.APIClient) *mongoClusterBuilder {
@@ -96,12 +96,17 @@ func newMongoClusterResource(
 		name = cluster.GetId()
 	}
 
+	id := fmt.Sprintf("%s/%s/%s", parentId.GetResource(), cluster.GetId(), cluster.GetName())
+
 	resource, err := rs.NewAppResource(
 		name,
-		mongoClusterUserResourceType,
-		cluster.GetId(),
+		mongoClusterResourceType,
+		id,
 		appTraits,
 		rs.WithParentResourceID(parentId),
+		rs.WithAnnotation(&v2.ChildResourceType{
+			ResourceTypeId: databaseResourceType.Id,
+		}),
 	)
 	if err != nil {
 		return nil, err

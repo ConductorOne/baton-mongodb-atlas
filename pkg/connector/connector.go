@@ -3,6 +3,9 @@ package connector
 import (
 	"context"
 	"io"
+	"time"
+
+	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -13,6 +16,7 @@ import (
 type MongoDB struct {
 	client          *admin.APIClient
 	createInviteKey bool
+	mongodriver     *mongodriver.MongoDriver
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -24,6 +28,8 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
 		newMongoClusterBuilder(d.client),
+		newDatabaseBuilder(d.client, d.mongodriver),
+		newCollectionBuilder(d.client, d.mongodriver),
 	}
 }
 
@@ -120,5 +126,6 @@ func New(ctx context.Context, publicKey, privateKey string, createInviteKey bool
 	return &MongoDB{
 		client:          client,
 		createInviteKey: createInviteKey,
+		mongodriver:     mongodriver.NewMongoDriver(client, time.Minute*30),
 	}, nil
 }

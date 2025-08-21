@@ -38,11 +38,27 @@ var (
 		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
 	}
 
-	mongoClusterUserResourceType = &v2.ResourceType{
+	mongoClusterResourceType = &v2.ResourceType{
 		Id:          "mongo_cluster",
 		DisplayName: "Mongo Cluster",
 		Description: "A MongoDB Atlas Cluster",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+	}
+
+	databaseResourceType = &v2.ResourceType{
+		Id:          "database",
+		DisplayName: "Database",
+		Description: "MongoDB Database",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
+		Annotations: nil,
+	}
+
+	collectionResourceType = &v2.ResourceType{
+		Id:          "collection",
+		DisplayName: "Collection",
+		Description: "MongoDB Collection",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
+		Annotations: nil,
 	}
 )
