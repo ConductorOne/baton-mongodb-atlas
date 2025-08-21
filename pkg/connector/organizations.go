@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
+
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -11,6 +14,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -22,7 +27,8 @@ var (
 		"ORG_READ_ONLY":         readOnlyEntitlement,
 		"ORG_MEMBER":            memberEntitlement,
 	}
-	organizationUserEntitlements = []string{
+	userRolesOrganizationEntitlementMapReversed = reverseMap(userRolesOrganizationEntitlementMap)
+	organizationUserEntitlements                = []string{
 		ownerEntitlement,
 		projectCreatorEntitlement,
 		billingAdminEntitlement,
@@ -115,6 +121,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(teamResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, memberEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent := entitlement.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -123,6 +130,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(databaseUserResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Member of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -131,6 +139,7 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 		entitlement.WithGrantableTo(projectResourceType),
 		entitlement.WithDescription(fmt.Sprintf("Part of %s organization", resource.DisplayName)),
 		entitlement.WithDisplayName(fmt.Sprintf("%s organization %s", resource.DisplayName, partEntitlement)),
+		entitlement.WithAnnotation(&v2.EntitlementImmutable{}),
 	}
 	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
@@ -195,6 +204,141 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	return rv, nextPage, nil, nil
 }
 
+func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
+	if resource.Id.ResourceType != userResourceType.Id {
+		return nil, nil, fmt.Errorf("baton-mongodb-atlas: cannot grant to resource type %s", resource.Id.ResourceType)
+	}
+
+	orgId := entitlement.Resource.Id.Resource
+	userId := resource.Id.Resource
+	userTrait, err := rs.GetUserTrait(resource)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.FailedPrecondition, "baton-mongodb-atlas: resource %s does not have a user trait", userId)
+	}
+
+	emails := userTrait.GetEmails()
+	var primaryEmail string
+	for _, email := range emails {
+		if email.IsPrimary {
+			primaryEmail = email.GetAddress()
+			break
+		}
+	}
+
+	if primaryEmail == "" {
+		return nil, nil, status.Errorf(codes.FailedPrecondition, "baton-mongodb-atlas: no primary email found for user %s", userId)
+	}
+
+	role := userRolesOrganizationEntitlementMapReversed[entitlement.Slug]
+
+	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var newRoles []string
+
+	if response.Roles.OrgRoles != nil {
+		for _, s := range *response.Roles.OrgRoles {
+			if s == role {
+				return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
+			}
+		}
+
+		newRoles = append(newRoles, *response.Roles.OrgRoles...)
+	}
+
+	newRoles = append(newRoles, role)
+
+	_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
+		ctx,
+		orgId,
+		userId,
+		&admin.OrgUserUpdateRequest{
+			Roles: &admin.OrgUserRolesRequest{
+				OrgRoles:             newRoles,
+				GroupRoleAssignments: response.Roles.GroupRoleAssignments,
+			},
+			TeamIds: response.TeamIds,
+		},
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newGrant := grant.NewGrant(resource, entitlement.Slug, &v2.ResourceId{
+		ResourceType: userResourceType.Id,
+		Resource:     userId,
+	})
+
+	return []*v2.Grant{newGrant}, nil, nil
+}
+
+func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
+	if grant.Principal.Id.ResourceType != userResourceType.Id {
+		return nil, fmt.Errorf("baton-mongodb-atlas: cannot revoke to resource type %s", grant.Principal.Id.ResourceType)
+	}
+
+	orgId := grant.Entitlement.Resource.Id.Resource
+	userId := grant.Principal.Id.Resource
+	role := userRolesOrganizationEntitlementMapReversed[grant.Entitlement.Slug]
+
+	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, err
+	}
+
+	if response.Roles.OrgRoles == nil {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+
+	var newRoles []string
+
+	for _, s := range *response.Roles.OrgRoles {
+		if s == role {
+			continue
+		}
+
+		newRoles = append(newRoles, s)
+	}
+
+	if len(newRoles) == len(*response.Roles.OrgRoles) {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+
+	if len(newRoles) == 0 {
+		l.Info(
+			"baton-mongodb-atlas: no roles to assign to user, removing from org",
+			zap.String("orgId", orgId),
+			zap.String("userId", userId),
+		)
+
+		_, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	} else {
+		_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
+			ctx,
+			orgId,
+			userId,
+			&admin.OrgUserUpdateRequest{
+				Roles: &admin.OrgUserRolesRequest{
+					OrgRoles:             newRoles,
+					GroupRoleAssignments: response.Roles.GroupRoleAssignments,
+				},
+				TeamIds: response.TeamIds,
+			},
+		).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	}
+
+	if err != nil {
+		return nil, wrapError(err, "failed to remove user role for organization user")
+	}
+
+	return nil, nil
+}
+
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
@@ -216,6 +360,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 			orgResource,
 			memberEntitlement,
 			teamResource.Id,
+			grant.WithAnnotation(&v2.GrantImmutable{}),
 		)
 
 		rv = append(rv, g)
@@ -255,6 +400,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 					Shallow:         true,
 					ResourceTypeIds: []string{databaseUserResourceType.Id},
 				},
+				&v2.GrantImmutable{},
 			),
 		)
 
@@ -283,7 +429,14 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Re
 
 		for _, roleName := range *user.Roles.OrgRoles {
 			if entitlementTarget, ok := userRolesOrganizationEntitlementMap[roleName]; ok {
-				rv = append(rv, grant.NewGrant(orgResource, entitlementTarget, userResource.Id))
+				rv = append(
+					rv,
+					grant.NewGrant(
+						orgResource,
+						entitlementTarget,
+						userResource.Id,
+					),
+				)
 			}
 		}
 	}

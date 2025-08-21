@@ -54,6 +54,7 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 	userTraits := []rs.UserTraitOption{
 		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.GetUsername()),
+		rs.WithEmail(user.GetUsername(), true),
 		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
 	}
 
