@@ -9,7 +9,6 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 
-	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -28,7 +27,6 @@ var dbRoles = []string{
 
 type databaseBuilder struct {
 	client            *admin.APIClient
-	mongodriver       *mongodriver.MongoDriver
 	enableMongoDriver bool
 }
 
@@ -36,10 +34,9 @@ func (o *databaseBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return databaseResourceType
 }
 
-func newDatabaseBuilder(client *admin.APIClient, mongodriver *mongodriver.MongoDriver, enableMongoDriver bool) *databaseBuilder {
+func newDatabaseBuilder(client *admin.APIClient, enableMongoDriver bool) *databaseBuilder {
 	return &databaseBuilder{
 		client:            client,
-		mongodriver:       mongodriver,
 		enableMongoDriver: enableMongoDriver,
 	}
 }
@@ -96,7 +93,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		return nil, "", nil, err
 	}
 
-	if !execute.HasResults() {
+	if execute.Results == nil || len(execute.GetResults()) == 0 {
 		return nil, "", nil, nil
 	}
 

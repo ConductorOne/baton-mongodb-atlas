@@ -29,7 +29,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
 		newMongoClusterBuilder(d.client),
-		newDatabaseBuilder(d.client, d.mongodriver, d.enableMongoDriver),
+		newDatabaseBuilder(d.client, d.enableMongoDriver),
 	}
 
 	if d.enableMongoDriver {
