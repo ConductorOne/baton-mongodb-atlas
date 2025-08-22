@@ -137,11 +137,6 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("organizationId is empty")
 	}
 
-	email, ok := profile["email"].(string)
-	if email == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("email is empty")
-	}
-
 	groupId, ok := profile["groupId"].(string)
 	if groupId == "" || !ok {
 		return nil, nil, annotations.Annotations{}, fmt.Errorf("groupId is empty")
@@ -156,6 +151,11 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	var user atlasUserResponse
 	if o.createInviteKey {
+		email, ok := profile["email"].(string)
+		if email == "" || !ok {
+			return nil, nil, annotations.Annotations{}, fmt.Errorf("email is empty")
+		}
+
 		l.Info("creating organization user")
 		userId, err = o.createUserIfNotExists(ctx, orgId, email, profile)
 		if err != nil {
