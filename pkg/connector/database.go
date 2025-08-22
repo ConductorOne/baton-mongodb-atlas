@@ -304,11 +304,19 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 		newRoles = append(newRoles, r)
 	}
 
-	dbUser.Roles = &newRoles
-	_, _, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
-		Execute() //nolint:bodyclose // The SDK handles closing the response body
-	if err != nil {
-		return nil, err
+	if len(newRoles) == 0 {
+		_, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupID, "admin", dbUsername).
+			Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		dbUser.Roles = &newRoles
+		_, _, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
+			Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil
