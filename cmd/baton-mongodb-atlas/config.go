@@ -17,6 +17,11 @@ var createInviteKeyField = field.BoolField("create-invite-key",
 	field.WithRequired(false),
 )
 
+var enableSyncDatabases = field.BoolField("enable-sync-databases",
+	field.WithDescription("Enable sync of databases as resources"),
+	field.WithRequired(false),
+)
+
 var enableMongoDriver = field.BoolField("enable-mongo-driver",
 	field.WithDescription("Enable MongoDB driver for additional functionality such as collection management"),
 	field.WithRequired(false),
@@ -26,6 +31,7 @@ var configFields = []field.SchemaField{
 	publicKeyField,
 	privateKeyField,
 	createInviteKeyField,
+	enableSyncDatabases,
 	enableMongoDriver,
 }
 

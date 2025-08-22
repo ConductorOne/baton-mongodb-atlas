@@ -14,10 +14,11 @@ import (
 )
 
 type MongoDB struct {
-	client            *admin.APIClient
-	createInviteKey   bool
-	mongodriver       *mongodriver.MongoDriver
-	enableMongoDriver bool
+	client              *admin.APIClient
+	createInviteKey     bool
+	mongodriver         *mongodriver.MongoDriver
+	enableMongoDriver   bool
+	enableSyncDatabases bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -28,12 +29,15 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newTeamBuilder(d.client),
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
-		newMongoClusterBuilder(d.client),
-		newDatabaseBuilder(d.client, d.enableMongoDriver),
+		newMongoClusterBuilder(d.client, d.enableSyncDatabases),
 	}
 
-	if d.enableMongoDriver {
-		builders = append(builders, newCollectionBuilder(d.client, d.mongodriver))
+	if d.enableSyncDatabases {
+		builders = append(builders, newDatabaseBuilder(d.client, d.enableMongoDriver))
+
+		if d.enableMongoDriver {
+			builders = append(builders, newCollectionBuilder(d.client, d.mongodriver))
+		}
 	}
 
 	return builders
@@ -123,16 +127,17 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableMongoDriver bool) (*MongoDB, error) {
+func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver bool) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err
 	}
 
 	return &MongoDB{
-		client:            client,
-		createInviteKey:   createInviteKey,
-		mongodriver:       mongodriver.NewMongoDriver(client, time.Minute*30),
-		enableMongoDriver: enableMongoDriver,
+		client:              client,
+		createInviteKey:     createInviteKey,
+		mongodriver:         mongodriver.NewMongoDriver(client, time.Minute*30),
+		enableSyncDatabases: enableSyncDatabases,
+		enableMongoDriver:   enableMongoDriver,
 	}, nil
 }
