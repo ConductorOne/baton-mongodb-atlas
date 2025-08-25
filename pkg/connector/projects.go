@@ -62,7 +62,7 @@ func newProjectResource(ctx context.Context, organizationId *v2.ResourceId, proj
 		rs.WithParentResourceID(organizationId),
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: databaseUserResourceType.Id},
-			&v2.ChildResourceType{ResourceTypeId: mongoClusterUserResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: mongoClusterResourceType.Id},
 		),
 	)
 	if err != nil {

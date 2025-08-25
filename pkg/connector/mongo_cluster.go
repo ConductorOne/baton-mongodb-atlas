@@ -14,16 +14,18 @@ import (
 )
 
 type mongoClusterBuilder struct {
-	client *admin.APIClient
+	client              *admin.APIClient
+	enableSyncDatabases bool
 }
 
 func (o *mongoClusterBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
-	return mongoClusterUserResourceType
+	return mongoClusterResourceType
 }
 
-func newMongoClusterBuilder(client *admin.APIClient) *mongoClusterBuilder {
+func newMongoClusterBuilder(client *admin.APIClient, enableSyncDatabases bool) *mongoClusterBuilder {
 	return &mongoClusterBuilder{
-		client: client,
+		client:              client,
+		enableSyncDatabases: enableSyncDatabases,
 	}
 }
 
@@ -60,7 +62,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	resources := make([]*v2.Resource, 0, len(response.GetResults()))
 
 	for _, cluster := range response.GetResults() {
-		resource, err := newMongoClusterResource(cluster, parentResourceID)
+		resource, err := newMongoClusterResource(cluster, parentResourceID, o.enableSyncDatabases)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create resource")
 		}
@@ -79,6 +81,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 func newMongoClusterResource(
 	cluster admin.ClusterDescription20240805,
 	parentId *v2.ResourceId,
+	enableSyncDatabases bool,
 ) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"cluster_id":   cluster.GetId(),
@@ -96,12 +99,24 @@ func newMongoClusterResource(
 		name = cluster.GetId()
 	}
 
+	id := fmt.Sprintf("%s/%s/%s", parentId.GetResource(), cluster.GetId(), cluster.GetName())
+
+	opts := []rs.ResourceOption{
+		rs.WithParentResourceID(parentId),
+	}
+
+	if enableSyncDatabases {
+		opts = append(opts, rs.WithAnnotation(&v2.ChildResourceType{
+			ResourceTypeId: databaseResourceType.Id,
+		}))
+	}
+
 	resource, err := rs.NewAppResource(
 		name,
-		mongoClusterUserResourceType,
-		cluster.GetId(),
+		mongoClusterResourceType,
+		id,
 		appTraits,
-		rs.WithParentResourceID(parentId),
+		opts...,
 	)
 	if err != nil {
 		return nil, err
