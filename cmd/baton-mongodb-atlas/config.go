@@ -35,7 +35,16 @@ var configFields = []field.SchemaField{
 	enableMongoDriver,
 }
 
-var configRelations = []field.SchemaFieldRelationship{}
+var configRelations = []field.SchemaFieldRelationship{
+	field.FieldsDependentOn(
+		[]field.SchemaField{
+			enableMongoDriver,
+		},
+		[]field.SchemaField{
+			enableSyncDatabases,
+		},
+	),
+}
 
 var cfg = field.Configuration{
 	Fields:      configFields,

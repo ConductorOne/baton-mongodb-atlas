@@ -59,6 +59,6 @@ var (
 		DisplayName: "Collection",
 		Description: "MongoDB Collection",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
-		Annotations: nil,
+		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
 	}
 )
