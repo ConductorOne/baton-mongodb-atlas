@@ -108,7 +108,7 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	key := fmt.Sprintf("%s/%s", groupID, clusterName)
+	key := groupID
 
 	if userSession, ok := m.accountsPerGroupId[key]; ok {
 		// If the user is about to be deleted, create a new one

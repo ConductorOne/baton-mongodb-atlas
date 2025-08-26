@@ -33,7 +33,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	}
 
 	if d.enableSyncDatabases {
-		builders = append(builders, newDatabaseBuilder(d.client, d.enableMongoDriver))
+		builders = append(builders, newDatabaseBuilder(d.client, d.enableMongoDriver, d.mongodriver))
 
 		if d.enableMongoDriver {
 			builders = append(builders, newCollectionBuilder(d.client, d.mongodriver))
