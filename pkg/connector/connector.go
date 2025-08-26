@@ -14,11 +14,12 @@ import (
 )
 
 type MongoDB struct {
-	client              *admin.APIClient
-	createInviteKey     bool
-	mongodriver         *mongodriver.MongoDriver
-	enableMongoDriver   bool
-	enableSyncDatabases bool
+	client                         *admin.APIClient
+	createInviteKey                bool
+	mongodriver                    *mongodriver.MongoDriver
+	enableMongoDriver              bool
+	enableSyncDatabases            bool
+	deleteDatabaseUserWithReadOnly bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -33,7 +34,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	}
 
 	if d.enableSyncDatabases {
-		builders = append(builders, newDatabaseBuilder(d.client, d.enableMongoDriver, d.mongodriver))
+		builders = append(builders, newDatabaseBuilder(d.client, d.enableMongoDriver, d.mongodriver, d.deleteDatabaseUserWithReadOnly))
 
 		if d.enableMongoDriver {
 			builders = append(builders, newCollectionBuilder(d.client, d.mongodriver))
@@ -132,17 +133,18 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver bool) (*MongoDB, error) {
+func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err
 	}
 
 	return &MongoDB{
-		client:              client,
-		createInviteKey:     createInviteKey,
-		mongodriver:         mongodriver.NewMongoDriver(client, time.Minute*30),
-		enableSyncDatabases: enableSyncDatabases,
-		enableMongoDriver:   enableMongoDriver,
+		client:                         client,
+		createInviteKey:                createInviteKey,
+		mongodriver:                    mongodriver.NewMongoDriver(client, time.Minute*30),
+		enableSyncDatabases:            enableSyncDatabases,
+		enableMongoDriver:              enableMongoDriver,
+		deleteDatabaseUserWithReadOnly: deleteDatabaseUserWithReadOnly,
 	}, nil
 }

@@ -27,12 +27,19 @@ var enableMongoDriver = field.BoolField("enable-mongo-driver",
 	field.WithRequired(false),
 )
 
+var deleteDatabaseUserWithReadOnly = field.BoolField(
+	"delete-database-user-with-read-only",
+	field.WithDescription("Delete database users that only have read@admin when revoke"),
+	field.WithRequired(false),
+)
+
 var configFields = []field.SchemaField{
 	publicKeyField,
 	privateKeyField,
 	createInviteKeyField,
 	enableSyncDatabases,
 	enableMongoDriver,
+	deleteDatabaseUserWithReadOnly,
 }
 
 var configRelations = []field.SchemaFieldRelationship{
