@@ -158,7 +158,12 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 		if err = client.Ping(ctx, nil); err != nil {
 			_ = client.Disconnect(ctx)
-			l.Error("Failed to ping MongoDB", zap.Error(err))
+			l.Error(
+				"Failed to ping MongoDB",
+				zap.Error(err),
+				zap.String("username", accountTuple.user.Username),
+				zap.String("cluster_name", clusterName),
+			)
 			time.Sleep(time.Second * 2) // Retry after a delay
 			continue
 		}
