@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 
+	"go.mongodb.org/mongo-driver/mongo/options"
+
 	"go.uber.org/zap"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
@@ -31,20 +33,27 @@ var dbRoles = []string{
 }
 
 type databaseBuilder struct {
-	client            *admin.APIClient
-	enableMongoDriver bool
-	mongodriver       *mongodriver.MongoDriver
+	client                         *admin.APIClient
+	enableMongoDriver              bool
+	mongodriver                    *mongodriver.MongoDriver
+	deleteDatabaseUserWithReadOnly bool
 }
 
 func (o *databaseBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return databaseResourceType
 }
 
-func newDatabaseBuilder(client *admin.APIClient, enableMongoDriver bool, mongodriver *mongodriver.MongoDriver) *databaseBuilder {
+func newDatabaseBuilder(
+	client *admin.APIClient,
+	enableMongoDriver bool,
+	mongodriver *mongodriver.MongoDriver,
+	deleteDatabaseUserWithReadOnly bool,
+) *databaseBuilder {
 	return &databaseBuilder{
-		client:            client,
-		enableMongoDriver: enableMongoDriver,
-		mongodriver:       mongodriver,
+		client:                         client,
+		enableMongoDriver:              enableMongoDriver,
+		mongodriver:                    mongodriver,
+		deleteDatabaseUserWithReadOnly: deleteDatabaseUserWithReadOnly,
 	}
 }
 
@@ -103,7 +112,10 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			return nil, "", nil, nil
 		}
 
-		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{})
+		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{}, &options.ListDatabasesOptions{
+			AuthorizedDatabases: boolPointer(false),
+			NameOnly:            boolPointer(true),
+		})
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -339,7 +351,7 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 		newRoles = append(newRoles, r)
 	}
 
-	if len(newRoles) == 0 {
+	if o.shouldDeleteUser(newRoles) {
 		_, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupID, "admin", dbUsername).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
@@ -355,4 +367,26 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 	}
 
 	return nil, nil
+}
+
+func (o *databaseBuilder) shouldDeleteUser(roles []admin.DatabaseUserRole) bool {
+	if len(roles) == 0 {
+		return true
+	}
+
+	if len(roles) == 1 {
+		if !o.deleteDatabaseUserWithReadOnly {
+			return false
+		}
+
+		if roles[0].RoleName == "read" && roles[0].DatabaseName == "admin" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func boolPointer(v bool) *bool {
+	return &v
 }

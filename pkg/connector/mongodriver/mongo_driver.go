@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"go.mongodb.org/mongo-driver/mongo/options"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 
@@ -15,12 +17,11 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type userSessionTuple struct {
-	user   *admin.CloudDatabaseUser
-	client *mongo.Client
+	pass string
+	user *admin.CloudDatabaseUser
 }
 
 type MongoDriver struct {
@@ -28,7 +29,9 @@ type MongoDriver struct {
 	accountTTL  time.Duration
 	mutex       sync.Mutex
 
+	// groupID -> clusterName -> userSessionTuple
 	accountsPerGroupId map[string]*userSessionTuple
+	clients            map[string]*mongo.Client
 }
 
 func NewMongoDriver(adminClient *admin.APIClient, accountTTL time.Duration) *MongoDriver {
@@ -36,6 +39,7 @@ func NewMongoDriver(adminClient *admin.APIClient, accountTTL time.Duration) *Mon
 		adminClient:        adminClient,
 		accountTTL:         accountTTL,
 		accountsPerGroupId: make(map[string]*userSessionTuple),
+		clients:            make(map[string]*mongo.Client),
 	}
 }
 
@@ -92,8 +96,8 @@ func (m *MongoDriver) Close(ctx context.Context) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	for _, tuple := range m.accountsPerGroupId {
-		err := tuple.client.Disconnect(ctx)
+	for _, client := range m.clients {
+		err := client.Disconnect(ctx)
 		if err != nil {
 			return err
 		}
@@ -108,36 +112,38 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	key := groupID
-
-	if userSession, ok := m.accountsPerGroupId[key]; ok {
-		// If the user is about to be deleted, create a new one
-		if time.Now().UTC().After(userSession.user.DeleteAfterDate.Add(-5 * time.Minute)) {
-			delete(m.accountsPerGroupId, key)
-			err := userSession.client.Disconnect(ctx)
-			if err != nil {
-				return nil, nil, err
-			}
-		} else {
-			return userSession.user, userSession.client, nil
+	accountTuple, ok := m.accountsPerGroupId[groupID]
+	if !ok {
+		user, password, err := m.createUser(ctx, groupID)
+		if err != nil {
+			return nil, nil, err
 		}
+
+		accountTuple = &userSessionTuple{
+			user: user,
+			pass: password,
+		}
+
+		m.accountsPerGroupId[groupID] = accountTuple
 	}
 
-	user, password, err := m.createUser(ctx, groupID)
-	if err != nil {
-		return nil, nil, err
+	clientKey := fmt.Sprintf("%s-%s", groupID, clusterName)
+
+	client, ok := m.clients[clientKey]
+	if ok {
+		return accountTuple.user, client, nil
 	}
 
-	time.Sleep(time.Second * 10) // Wait for the user to be fully created and available
+	time.Sleep(time.Second * 5) // Wait for the user to be fully created and available
 
 	uri, err := m.connectionString(ctx, groupID, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	escapedPwd := url.QueryEscape(password)
+	escapedPwd := url.QueryEscape(accountTuple.pass)
 
-	uri = fmt.Sprintf("mongodb+srv://%s:%s@%s", user.Username, escapedPwd, uri)
+	uri = fmt.Sprintf("mongodb+srv://%s:%s@%s", accountTuple.user.Username, escapedPwd, uri)
 
 	for i := range 10 {
 		l.Info("Trying to connect to MongoDB", zap.Int("retry", i))
@@ -152,17 +158,19 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 		if err = client.Ping(ctx, nil); err != nil {
 			_ = client.Disconnect(ctx)
-			l.Error("Failed to ping MongoDB", zap.Error(err))
+			l.Error(
+				"Failed to ping MongoDB",
+				zap.Error(err),
+				zap.String("username", accountTuple.user.Username),
+				zap.String("cluster_name", clusterName),
+			)
 			time.Sleep(time.Second * 2) // Retry after a delay
 			continue
 		}
 
-		m.accountsPerGroupId[key] = &userSessionTuple{
-			user:   user,
-			client: client,
-		}
+		m.clients[clientKey] = client
 
-		return user, client, nil
+		return accountTuple.user, client, nil
 	}
 
 	return nil, nil, fmt.Errorf("failed to connect to MongoDB after multiple attempts")

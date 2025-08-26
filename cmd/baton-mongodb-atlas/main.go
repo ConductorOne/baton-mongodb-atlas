@@ -44,7 +44,8 @@ func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, e
 	createInviteKey := v.GetBool("create-invite-key")
 	enableMongoDriver := v.GetBool("enable-mongo-driver")
 	enableSyncDatabases := v.GetBool("enable-sync-databases")
-	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey, enableSyncDatabases, enableMongoDriver)
+	deleteDatabaseUserWithReadOnly := v.GetBool(deleteDatabaseUserWithReadOnly.FieldName)
+	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
