@@ -6,6 +6,11 @@ import (
 	"slices"
 	"strings"
 
+	"go.uber.org/zap"
+
+	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 
@@ -28,16 +33,18 @@ var dbRoles = []string{
 type databaseBuilder struct {
 	client            *admin.APIClient
 	enableMongoDriver bool
+	mongodriver       *mongodriver.MongoDriver
 }
 
 func (o *databaseBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return databaseResourceType
 }
 
-func newDatabaseBuilder(client *admin.APIClient, enableMongoDriver bool) *databaseBuilder {
+func newDatabaseBuilder(client *admin.APIClient, enableMongoDriver bool, mongodriver *mongodriver.MongoDriver) *databaseBuilder {
 	return &databaseBuilder{
 		client:            client,
 		enableMongoDriver: enableMongoDriver,
+		mongodriver:       mongodriver,
 	}
 }
 
@@ -85,27 +92,52 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	}
 	process := strings.TrimPrefix(connectionString[0], "mongodb://")
 
-	execute, _, err := o.client.MonitoringAndLogsApi.ListDatabases(ctx, groupID, process).
-		PageNum(page).
-		ItemsPerPage(resourcePageSize).
-		Execute() //nolint:bodyclose // The SDK handles closing the response body
-	if err != nil {
-		return nil, "", nil, err
-	}
+	var databases []string
+	if o.enableMongoDriver {
+		l.Info("using mongo driver to list databases")
 
-	if execute.Results == nil || len(execute.GetResults()) == 0 {
-		return nil, "", nil, nil
+		_, mongoDriver, err := o.mongodriver.Connect(ctx, groupID, clusterName)
+		if err != nil {
+			l.Error("failed to connect to MongoDB Atlas cluster skipping database sync", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
+			// We are skipping databases if we can't connect to the cluster.
+			return nil, "", nil, nil
+		}
+
+		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{})
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		databases = names
+	} else {
+		l.Info("using atlas api to list databases")
+
+		execute, _, err := o.client.MonitoringAndLogsApi.ListDatabases(ctx, groupID, process).
+			PageNum(page).
+			ItemsPerPage(resourcePageSize).
+			Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		if execute.Results == nil || len(execute.GetResults()) == 0 {
+			return nil, "", nil, nil
+		}
+
+		for _, database := range execute.GetResults() {
+			databases = append(databases, database.GetDatabaseName())
+		}
 	}
 
 	resources := make([]*v2.Resource, 0)
 
-	for _, database := range execute.GetResults() {
-		if database.DatabaseName == nil || *database.DatabaseName == "" {
+	for _, database := range databases {
+		if database == "" {
 			l.Warn("Skipping database with empty name")
 			continue
 		}
 
-		resource, err := newDatabaseResource(groupID, clusterName, *database.DatabaseName, parentResourceID, o.enableMongoDriver)
+		resource, err := newDatabaseResource(groupID, clusterName, database, parentResourceID, o.enableMongoDriver)
 		if err != nil {
 			return nil, "", nil, wrapError(err, "failed to create resource")
 		}
@@ -113,9 +145,12 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		resources = append(resources, resource)
 	}
 
-	nextPage, err := getPageTokenFromPage(bag, page+1)
-	if err != nil {
-		return nil, "", nil, err
+	nextPage := ""
+	if !o.enableMongoDriver {
+		nextPage, err = getPageTokenFromPage(bag, page+1)
+		if err != nil {
+			return nil, "", nil, err
+		}
 	}
 
 	return resources, nextPage, nil, nil
