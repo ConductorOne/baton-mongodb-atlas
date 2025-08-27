@@ -2,6 +2,11 @@ package connector
 
 import (
 	"context"
+	"fmt"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -35,7 +40,7 @@ func newDatabaseUserResource(ctx context.Context, projectId *v2.ResourceId, user
 	resource, err := rs.NewUserResource(
 		user.Username,
 		databaseUserResourceType,
-		user.Username,
+		fmt.Sprintf("%s/%s", user.GroupId, user.Username),
 		userTraits,
 		rs.WithParentResourceID(projectId),
 	)
@@ -102,4 +107,30 @@ func (o *databaseUserBuilder) Entitlements(_ context.Context, resource *v2.Resou
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *databaseUserBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
+}
+
+func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId) (annotations.Annotations, error) {
+	groupId, dbUser, err := databaseUserId(resourceId.Resource)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupId, "admin", dbUser).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func databaseUserId(resourceId string) (string, string, error) {
+	splited := strings.Split(resourceId, "/")
+	if len(splited) != 2 {
+		return "", "", status.Errorf(codes.InvalidArgument, "database user id is invalid: %s", resourceId)
+	}
+
+	groupId := splited[0]
+	dbUserId := splited[1]
+
+	return groupId, dbUserId, nil
 }

@@ -210,7 +210,12 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 	}
 
 	orgId := entitlement.Resource.Id.Resource
-	userId := resource.Id.Resource
+
+	_, userId, err := userOrgId(resource.Id.Resource)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	userTrait, err := rs.GetUserTrait(resource)
 	if err != nil {
 		return nil, nil, status.Errorf(codes.FailedPrecondition, "baton-mongodb-atlas: resource %s does not have a user trait", userId)
@@ -283,8 +288,12 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 	}
 
 	orgId := grant.Entitlement.Resource.Id.Resource
-	userId := grant.Principal.Id.Resource
 	role := userRolesOrganizationEntitlementMapReversed[grant.Entitlement.Slug]
+
+	_, userId, err := userOrgId(grant.Principal.Id.Resource)
+	if err != nil {
+		return nil, err
+	}
 
 	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {

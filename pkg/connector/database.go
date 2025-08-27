@@ -250,7 +250,7 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	for _, user := range dbUsers.GetResults() {
 		userId := &v2.ResourceId{
 			ResourceType: databaseUserResourceType.Id,
-			Resource:     user.Username,
+			Resource:     fmt.Sprintf("%s/%s", user.GroupId, user.Username),
 		}
 
 		for _, role := range user.GetRoles() {
@@ -290,7 +290,10 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 	dbName := splited[2]
 	role := entitlement.Slug
 
-	dbUsername := resource.Id.Resource
+	_, dbUsername, err := databaseUserId(resource.Id.Resource)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	dbUser, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
@@ -313,7 +316,7 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 
 	userId := &v2.ResourceId{
 		ResourceType: databaseUserResourceType.Id,
-		Resource:     dbUser.Username,
+		Resource:     fmt.Sprintf("%s/%s", groupID, dbName),
 	}
 
 	return []*v2.Grant{
@@ -335,7 +338,10 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 	dbName := splited[2]
 	role := grant.Entitlement.Slug
 
-	dbUsername := grant.Principal.Id.Resource
+	_, dbUsername, err := databaseUserId(grant.Principal.Id.Resource)
+	if err != nil {
+		return nil, err
+	}
 
 	dbUser, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body

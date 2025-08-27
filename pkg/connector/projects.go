@@ -332,7 +332,12 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	_, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	_, userId, err := userOrgId(grant.Principal.Id.Resource)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err := wrapError(err, "failed to remove user from project")
 
