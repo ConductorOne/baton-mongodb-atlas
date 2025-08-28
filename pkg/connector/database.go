@@ -92,7 +92,8 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	connectionsStrings := clusterInfo.GetConnectionStrings()
 	if connectionsStrings.Standard == nil {
-		return nil, "", nil, fmt.Errorf("cluster %s does not have a standard connection string", clusterName)
+		l.Warn("Cluster does not have a standard connection string", zap.Any("clusterInfo", clusterInfo))
+		return nil, "", nil, nil
 	}
 
 	connectionString := strings.Split(*connectionsStrings.Standard, ",")
