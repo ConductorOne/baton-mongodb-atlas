@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	cfg "github.com/conductorone/baton-mongodb-atlas/pkg/config"
+
 	configschema "github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector"
@@ -20,15 +21,18 @@ var connectorName = "baton-mongodb-atlas"
 
 func main() {
 	ctx := context.Background()
-
-	_, cmd, err := configschema.DefineConfiguration(ctx, connectorName, getConnector, cfg)
+	_, cmd, err := configschema.DefineConfiguration(
+		ctx,
+		connectorName,
+		getConnector,
+		cfg.Config,
+	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	cmd.Version = version
-
 	err = cmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -36,16 +40,22 @@ func main() {
 	}
 }
 
-func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, error) {
+func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
 
-	publicKey := v.GetString("public-key")
-	privateKey := v.GetString("private-key")
-	createInviteKey := v.GetBool("create-invite-key")
-	enableMongoDriver := v.GetBool("enable-mongo-driver")
-	enableSyncDatabases := v.GetBool("enable-sync-databases")
-	deleteDatabaseUserWithReadOnly := v.GetBool(deleteDatabaseUserWithReadOnly.FieldName)
-	cb, err := connector.New(ctx, publicKey, privateKey, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly)
+	if err := cfg.ValidateConfig(cc); err != nil {
+		return nil, err
+	}
+
+	cb, err := connector.New(
+		ctx,
+		cc.PublicKey,
+		cc.PrivateKey,
+		cc.CreateInviteKey,
+		cc.EnableSyncDatabases,
+		cc.EnableMongoDriver,
+		cc.DeleteDatabaseUserWithReadOnly,
+	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
