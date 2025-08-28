@@ -4,9 +4,9 @@ BUILD_DIR = dist/${GOOS}_${GOARCH}
 GENERATED_CONF := pkg/config/conf.gen.go
 
 ifeq ($(GOOS),windows)
-OUTPUT_PATH = ${BUILD_DIR}/baton-[connector].exe
+OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb-atlas.exe
 else
-OUTPUT_PATH = ${BUILD_DIR}/baton-[connector]
+OUTPUT_PATH = ${BUILD_DIR}/baton-mongodb-atlas
 endif
 
 # Set the build tag conditionally based on ENABLE_LAMBDA
@@ -18,7 +18,7 @@ endif
 
 .PHONY: build
 build: $(GENERATED_CONF)
-	go build ${BUILD_TAGS} -o ${OUTPUT_PATH} ./cmd/baton-[connector]
+	go build ${BUILD_TAGS} -o ${OUTPUT_PATH} ./cmd/baton-mongodb-atlas
 
 $(GENERATED_CONF): pkg/config/config.go go.mod
 	@echo "Generating $(GENERATED_CONF)..."
