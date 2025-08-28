@@ -15,6 +15,7 @@ var PrivateKeyField = field.StringField(
 	field.WithDisplayName("Private key"),
 	field.WithDescription("Your MongoDB Atlas private key"),
 	field.WithRequired(true),
+	field.WithIsSecret(true),
 )
 var CreateInviteKeyField = field.BoolField(
 	"mongodbatlas_create_invite",
@@ -28,6 +29,7 @@ var EnableSyncDatabases = field.BoolField(
 	field.WithDisplayName("Sync Databases"),
 	field.WithDescription("If enabled, Baton will sync database users and roles."),
 	field.WithRequired(false),
+	field.WithDefaultValue(true),
 )
 
 var EnableMongoDriver = field.BoolField(
