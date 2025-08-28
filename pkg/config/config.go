@@ -37,6 +37,7 @@ var EnableMongoDriver = field.BoolField(
 	field.WithDisplayName("Enable Mongo Driver"),
 	field.WithDescription("If enabled, Baton will use the MongoDB Go Driver to fetch database collections."),
 	field.WithRequired(false),
+	field.WithDefaultValue(false),
 )
 
 var DeleteDatabaseUserWithReadOnly = field.BoolField(
@@ -44,6 +45,7 @@ var DeleteDatabaseUserWithReadOnly = field.BoolField(
 	field.WithDisplayName("Enable Delete Database User when only having read@admin"),
 	field.WithDescription("If enabled, Baton will delete database users that only have read@admin role when revoking access."),
 	field.WithRequired(false),
+	field.WithDefaultValue(false),
 )
 
 //go:generate go run ./gen
