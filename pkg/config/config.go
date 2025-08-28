@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/conductorone/baton-sdk/pkg/field"
 )
 
@@ -78,5 +80,13 @@ var Config = field.NewConfiguration(
 // needs to perform extra validations that cannot be encoded with configuration
 // parameters.
 func ValidateConfig(cfg *Mongodbatlas) error {
+	if cfg.PublicKey == "" {
+		return fmt.Errorf("config: missing public key")
+	}
+
+	if cfg.PrivateKey == "" {
+		return fmt.Errorf("config: missing private key")
+	}
+
 	return nil
 }
