@@ -49,12 +49,12 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 
 	cb, err := connector.New(
 		ctx,
-		cc.PublicKey,
-		cc.PrivateKey,
-		cc.CreateInviteKey,
-		cc.EnableSyncDatabases,
-		cc.EnableMongoDriver,
-		cc.DeleteDatabaseUserWithReadOnly,
+		cc.Mongodbatlas_public_key,
+		cc.Mongodbatlas_private_key,
+		cc.Mongodbatlas_create_invite,
+		cc.Mongodbatlas_enable_sync_database,
+		cc.Mongodbatlas_enable_mongo_driver,
+		cc.Mongodbatlas_enable_delete_database_user_with_read_only,
 	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
