@@ -5,27 +5,27 @@ import (
 )
 
 var PublicKeyField = field.StringField(
-	"mongodbatlas_public_key",
+	"public-key",
 	field.WithDisplayName("Public key"),
 	field.WithDescription("Your MongoDB Atlas public key"),
 	field.WithRequired(true),
 )
 var PrivateKeyField = field.StringField(
-	"mongodbatlas_private_key",
+	"private-key",
 	field.WithDisplayName("Private key"),
 	field.WithDescription("Your MongoDB Atlas private key"),
 	field.WithRequired(true),
 	field.WithIsSecret(true),
 )
 var CreateInviteKeyField = field.BoolField(
-	"mongodbatlas_create_invite",
+	"create-invite-key",
 	field.WithDisplayName("Create Invite"),
 	field.WithDescription("If enabled, Baton will create invites for users that do not have an account in MongoDB Atlas when provisioning."),
 	field.WithRequired(false),
 )
 
 var EnableSyncDatabases = field.BoolField(
-	"mongodbatlas_enable_sync_database",
+	"enable-sync-databases",
 	field.WithDisplayName("Sync Databases"),
 	field.WithDescription("If enabled, Baton will sync database users and roles."),
 	field.WithRequired(false),
@@ -33,7 +33,7 @@ var EnableSyncDatabases = field.BoolField(
 )
 
 var EnableMongoDriver = field.BoolField(
-	"mongodbatlas_enable_mongo_driver",
+	"enable-mongo-driver",
 	field.WithDisplayName("Enable Mongo Driver"),
 	field.WithDescription("If enabled, Baton will use the MongoDB Go Driver to fetch database collections."),
 	field.WithRequired(false),
@@ -41,7 +41,7 @@ var EnableMongoDriver = field.BoolField(
 )
 
 var DeleteDatabaseUserWithReadOnly = field.BoolField(
-	"mongodbatlas_enable_delete_database_user_with_read_only",
+	"delete-database-user-with-read-only",
 	field.WithDisplayName("Enable Delete Database User when only having read@admin"),
 	field.WithDescription("If enabled, Baton will delete database users that only have read@admin role when revoking access."),
 	field.WithRequired(false),

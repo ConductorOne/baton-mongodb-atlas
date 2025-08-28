@@ -4,12 +4,12 @@ package config
 import "reflect" 
 
 type Mongodbatlas struct {
-	Mongodbatlas_public_key string `mapstructure:"mongodbatlas_public_key"`
-	Mongodbatlas_private_key string `mapstructure:"mongodbatlas_private_key"`
-	Mongodbatlas_create_invite bool `mapstructure:"mongodbatlas_create_invite"`
-	Mongodbatlas_enable_sync_database bool `mapstructure:"mongodbatlas_enable_sync_database"`
-	Mongodbatlas_enable_mongo_driver bool `mapstructure:"mongodbatlas_enable_mongo_driver"`
-	Mongodbatlas_enable_delete_database_user_with_read_only bool `mapstructure:"mongodbatlas_enable_delete_database_user_with_read_only"`
+	PublicKey string `mapstructure:"public-key"`
+	PrivateKey string `mapstructure:"private-key"`
+	CreateInviteKey bool `mapstructure:"create-invite-key"`
+	EnableSyncDatabases bool `mapstructure:"enable-sync-databases"`
+	EnableMongoDriver bool `mapstructure:"enable-mongo-driver"`
+	DeleteDatabaseUserWithReadOnly bool `mapstructure:"delete-database-user-with-read-only"`
 }
 
 func (c* Mongodbatlas) findFieldByTag(tagValue string) (any, bool) {
