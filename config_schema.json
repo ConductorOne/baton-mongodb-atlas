@@ -1,0 +1,117 @@
+{
+  "fields": [
+    {
+      "name": "create-invite-key",
+      "displayName": "Create Invite",
+      "description": "If enabled, Baton will create invites for users that do not have an account in MongoDB Atlas when provisioning.",
+      "boolField": {}
+    },
+    {
+      "name": "delete-database-user-with-read-only",
+      "displayName": "Enable Delete Database User when only having read@admin",
+      "description": "If enabled, Baton will delete database users that only have read@admin role when revoking access.",
+      "boolField": {}
+    },
+    {
+      "name": "enable-mongo-driver",
+      "displayName": "Enable Mongo Driver",
+      "description": "If enabled, Baton will use the MongoDB Go Driver to fetch database collections.",
+      "boolField": {}
+    },
+    {
+      "name": "enable-sync-databases",
+      "displayName": "Sync Databases",
+      "description": "If enabled, Baton will sync database users and roles.",
+      "boolField": {
+        "defaultValue": true
+      }
+    },
+    {
+      "name": "log-level",
+      "description": "The log level: debug, info, warn, error",
+      "isOps": true,
+      "stringField": {
+        "defaultValue": "info"
+      }
+    },
+    {
+      "name": "log-level-debug-expires-at",
+      "description": "The timestamp indicating when debug-level logging should expire",
+      "isOps": true,
+      "stringField": {}
+    },
+    {
+      "name": "otel-collector-endpoint",
+      "description": "The endpoint of the OpenTelemetry collector to send observability data to (used for both tracing and logging if specific endpoints are not provided)",
+      "isOps": true,
+      "stringField": {}
+    },
+    {
+      "name": "otel-collector-endpoint-tls-cert",
+      "description": "A PEM-encoded certificate to use as a CA for TLS connections to the OpenTelemetry collector",
+      "isOps": true,
+      "stringField": {}
+    },
+    {
+      "name": "otel-collector-endpoint-tls-cert-path",
+      "description": "Path to a file containing a PEM-encoded certificate to use as a CA for TLS connections to the OpenTelemetry collector",
+      "isOps": true,
+      "stringField": {}
+    },
+    {
+      "name": "otel-collector-endpoint-tls-insecure",
+      "description": "Allow insecure connections to the OpenTelemetry collector",
+      "isOps": true,
+      "boolField": {}
+    },
+    {
+      "name": "otel-logging-disabled",
+      "description": "Disable OpenTelemetry logging",
+      "isOps": true,
+      "boolField": {}
+    },
+    {
+      "name": "otel-tracing-disabled",
+      "description": "Disable OpenTelemetry tracing",
+      "isOps": true,
+      "boolField": {}
+    },
+    {
+      "name": "private-key",
+      "displayName": "Private key",
+      "description": "Your MongoDB Atlas private key",
+      "isRequired": true,
+      "isSecret": true,
+      "stringField": {
+        "rules": {
+          "isRequired": true
+        }
+      }
+    },
+    {
+      "name": "public-key",
+      "displayName": "Public key",
+      "description": "Your MongoDB Atlas public key",
+      "isRequired": true,
+      "stringField": {
+        "rules": {
+          "isRequired": true
+        }
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "kind": "CONSTRAINT_KIND_DEPENDENT_ON",
+      "fieldNames": [
+        "enable-mongo-driver"
+      ],
+      "secondaryFieldNames": [
+        "enable-sync-databases"
+      ]
+    }
+  ],
+  "displayName": "MongodbAtlas",
+  "helpUrl": "/docs/baton/mongodb-atlas",
+  "iconUrl": "/static/app-icons/mongodb.svg"
+}
