@@ -145,10 +145,14 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 	uri = fmt.Sprintf("mongodb+srv://%s:%s@%s", accountTuple.user.Username, escapedPwd, uri)
 
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		l.Info("Trying to connect to MongoDB", zap.Int("retry", i))
 
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+		opts := options.Client().ApplyURI(uri).
+			SetMaxConnIdleTime(60 * time.Second).
+			SetMaxPoolSize(10)
+
+		client, err := mongo.Connect(ctx, opts)
 		if err != nil {
 			l.Error("Failed to connect to MongoDB", zap.Error(err))
 
