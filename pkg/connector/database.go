@@ -84,23 +84,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	// clusterID := splited[1]
 	clusterName := splited[2]
 
-	clusterInfo, _, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
-		Execute() //nolint:bodyclose // The SDK handles closing the response body
-	if err != nil {
-		return nil, "", nil, err
-	}
-
-	connectionsStrings := clusterInfo.GetConnectionStrings()
-	if connectionsStrings.Standard == nil {
-		l.Warn("Cluster does not have a standard connection string", zap.Any("clusterInfo", clusterInfo))
-		return nil, "", nil, nil
-	}
-
-	connectionString := strings.Split(*connectionsStrings.Standard, ",")
-	if len(connectionString) == 0 {
-		return nil, "", nil, fmt.Errorf("cluster %s does not have a valid connection string", clusterName)
-	}
-	process := strings.TrimPrefix(connectionString[0], "mongodb://")
+	l = l.With(zap.String("group_id", groupID), zap.String("cluster_name", clusterName))
 
 	var databases []string
 	if o.enableMongoDriver {
@@ -108,7 +92,10 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 		_, mongoDriver, err := o.mongodriver.Connect(ctx, groupID, clusterName)
 		if err != nil {
-			l.Error("failed to connect to MongoDB Atlas cluster skipping database sync", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
+			l.Error(
+				"failed to connect to MongoDB Atlas cluster skipping database sync",
+				zap.Error(err),
+			)
 			// We are skipping databases if we can't connect to the cluster.
 			return nil, "", nil, nil
 		}
@@ -121,9 +108,29 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			return nil, "", nil, err
 		}
 
+		l.Info("listing databases", zap.Any("databases", names))
+
 		databases = names
 	} else {
 		l.Info("using atlas api to list databases")
+
+		clusterInfo, _, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
+			Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		connectionsStrings := clusterInfo.GetConnectionStrings()
+		if connectionsStrings.Standard == nil {
+			l.Warn("Cluster does not have a standard connection string", zap.Any("clusterInfo", clusterInfo))
+			return nil, "", nil, nil
+		}
+
+		connectionString := strings.Split(*connectionsStrings.Standard, ",")
+		if len(connectionString) == 0 {
+			return nil, "", nil, fmt.Errorf("cluster %s does not have a valid connection string", clusterName)
+		}
+		process := strings.TrimPrefix(connectionString[0], "mongodb://")
 
 		execute, _, err := o.client.MonitoringAndLogsApi.ListDatabases(ctx, groupID, process).
 			PageNum(page).
