@@ -97,7 +97,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 				zap.Error(err),
 			)
 			// We are skipping databases if we can't connect to the cluster.
-			return nil, "", nil, nil
+			return nil, "", nil, err
 		}
 
 		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{}, &options.ListDatabasesOptions{
