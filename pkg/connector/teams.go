@@ -179,7 +179,11 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	userId := principal.Id.Resource
+	_, userId, err := userOrgId(principal.Id.Resource)
+	if err != nil {
+		return nil, err
+	}
+
 	if principal.Id.ResourceType != userResourceType.Id {
 		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
 
@@ -227,7 +231,11 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	userId := grant.Principal.Id.Resource
+	_, userId, err := userOrgId(grant.Principal.Id.Resource)
+	if err != nil {
+		return nil, err
+	}
+
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
 		err := fmt.Errorf("mongodb connector: only users can be removed from teams")
 

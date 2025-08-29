@@ -61,7 +61,7 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 	resource, err := rs.NewUserResource(
 		user.GetUsername(),
 		userResourceType,
-		userId,
+		fmt.Sprintf("%s/%s", organizationId.GetResource(), userId),
 		userTraits,
 		rs.WithParentResourceID(organizationId),
 	)
@@ -228,11 +228,21 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		l.Error(
-			"failed to create database user",
-			zap.Error(err),
-		)
-		return nil, nil, nil, err
+		if !strings.Contains(err.Error(), "USER_ALREADY_EXISTS") {
+			l.Error(
+				"failed to create database user",
+				zap.Error(err),
+			)
+			return nil, nil, nil, err
+		}
+
+		l.Info("database user already exists, fetching existing user", zap.String("username", username))
+
+		dbUser, _, err = o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupId, defaultDatabase, username).
+			Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	var resource *v2.Resource
@@ -332,6 +342,36 @@ func (o *userBuilder) createUserIfNotExists(ctx context.Context, orgId, email st
 	}
 
 	return orgUser.Id, nil
+}
+
+func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId) (annotations.Annotations, error) {
+	if resourceId == nil {
+		return nil, status.Error(codes.InvalidArgument, "resourceId is nil")
+	}
+
+	orgId, userId, err := userOrgId(resourceId.GetResource())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func userOrgId(resourceId string) (string, string, error) {
+	splited := strings.Split(resourceId, "/")
+	if len(splited) != 2 {
+		return "", "", status.Errorf(codes.InvalidArgument, "user resourceId is invalid: %s", resourceId)
+	}
+
+	orgId := splited[0]
+	userId := splited[1]
+
+	return orgId, userId, nil
 }
 
 func newUserBuilder(client *admin.APIClient, createInviteKey bool) *userBuilder {
