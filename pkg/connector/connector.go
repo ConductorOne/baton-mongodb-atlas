@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
+
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -20,6 +22,7 @@ type MongoDB struct {
 	enableMongoDriver              bool
 	enableSyncDatabases            bool
 	deleteDatabaseUserWithReadOnly bool
+	mProxy                         *mongoconfig.MongoProxy
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -143,7 +146,7 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool) (*MongoDB, error) {
+func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool, mProxy *mongoconfig.MongoProxy) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err
@@ -152,9 +155,10 @@ func New(ctx context.Context, publicKey, privateKey string, createInviteKey, ena
 	return &MongoDB{
 		client:                         client,
 		createInviteKey:                createInviteKey,
-		mongodriver:                    mongodriver.NewMongoDriver(client, time.Minute*30),
+		mongodriver:                    mongodriver.NewMongoDriver(client, time.Minute*30, mProxy),
 		enableSyncDatabases:            enableSyncDatabases,
 		enableMongoDriver:              enableMongoDriver,
 		deleteDatabaseUserWithReadOnly: deleteDatabaseUserWithReadOnly,
+		mProxy:                         mProxy,
 	}, nil
 }

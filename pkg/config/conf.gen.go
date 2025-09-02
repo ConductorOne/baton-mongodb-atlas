@@ -10,6 +10,10 @@ type Mongodbatlas struct {
 	EnableSyncDatabases bool `mapstructure:"enable-sync-databases"`
 	EnableMongoDriver bool `mapstructure:"enable-mongo-driver"`
 	DeleteDatabaseUserWithReadOnly bool `mapstructure:"delete-database-user-with-read-only"`
+	MongoProxyHost string `mapstructure:"mongo-proxy-host"`
+	MongoProxyPort int `mapstructure:"mongo-proxy-port"`
+	MongoProxyUser string `mapstructure:"mongo-proxy-user"`
+	MongoProxyPass string `mapstructure:"mongo-proxy-pass"`
 }
 
 func (c* Mongodbatlas) findFieldByTag(tagValue string) (any, bool) {
