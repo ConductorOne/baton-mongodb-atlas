@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -274,6 +275,23 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	}
 
 	return response, plaintextData, nil, err
+}
+
+func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, parentResourceID *v2.ResourceId) (annotations.Annotations, error) {
+	userId := resourceId.Resource
+
+	if parentResourceID == nil {
+		return nil, errors.New("parent resource id is empty")
+	}
+
+	orgId := parentResourceID.Resource
+
+	_, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func parseStrList(strFrom any, defaultValue []string) *[]string {
