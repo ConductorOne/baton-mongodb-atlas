@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -102,4 +103,21 @@ func (o *databaseUserBuilder) Entitlements(_ context.Context, resource *v2.Resou
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *databaseUserBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
+}
+
+func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, parentResourceID *v2.ResourceId) (annotations.Annotations, error) {
+	dbUserId := resourceId.Resource
+
+	if parentResourceID == nil {
+		return nil, errors.New("database user must have a parent resource")
+	}
+
+	groupId := parentResourceID.Resource
+
+	_, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupId, "admin", dbUserId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
