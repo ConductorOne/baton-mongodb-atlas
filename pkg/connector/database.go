@@ -346,8 +346,7 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		if atlasErr, ok := admin.AsError(err); ok {
-			switch atlasErr.ErrorCode {
-			case "USERNAME_NOT_FOUND":
+			if atlasErr.ErrorCode == "USERNAME_NOT_FOUND" {
 				return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 			}
 		}
