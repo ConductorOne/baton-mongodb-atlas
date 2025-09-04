@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
-
 	"go.uber.org/zap"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
@@ -298,6 +297,12 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 		return nil, nil, err
 	}
 
+	for _, r := range dbUser.GetRoles() {
+		if r.DatabaseName == dbName && r.RoleName == role {
+			return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
+	}
+
 	newRoles := append(dbUser.GetRoles(), admin.DatabaseUserRole{
 		DatabaseName: dbName,
 		RoleName:     role,
@@ -340,16 +345,27 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 	dbUser, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		if atlasErr, ok := admin.AsError(err); ok {
+			if atlasErr.ErrorCode == "USERNAME_NOT_FOUND" {
+				return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+			}
+		}
 		return nil, err
 	}
 
 	// Remove the role from the user
+	found := false
 	var newRoles []admin.DatabaseUserRole
 	for _, r := range dbUser.GetRoles() {
 		if r.DatabaseName == dbName && r.RoleName == role {
+			found = true
 			continue // Skip the role we want to remove
 		}
 		newRoles = append(newRoles, r)
+	}
+
+	if !found {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 	}
 
 	if o.shouldDeleteUser(newRoles) {
