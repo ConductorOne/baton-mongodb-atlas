@@ -297,6 +297,12 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 		return nil, nil, err
 	}
 
+	for _, r := range dbUser.GetRoles() {
+		if r.DatabaseName == dbName && r.RoleName == role {
+			return nil, annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
+	}
+
 	newRoles := append(dbUser.GetRoles(), admin.DatabaseUserRole{
 		DatabaseName: dbName,
 		RoleName:     role,
@@ -349,12 +355,18 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 	}
 
 	// Remove the role from the user
+	found := false
 	var newRoles []admin.DatabaseUserRole
 	for _, r := range dbUser.GetRoles() {
 		if r.DatabaseName == dbName && r.RoleName == role {
+			found = true
 			continue // Skip the role we want to remove
 		}
 		newRoles = append(newRoles, r)
+	}
+
+	if !found {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 	}
 
 	if o.shouldDeleteUser(newRoles) {
