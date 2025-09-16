@@ -96,7 +96,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		zap.Int("ItemsPerPage", resourcePageSize),
 	)
 
-	projects, _, err := p.client.
+	projects, resp, err := p.client.
 		ProjectsApi.
 		ListProjects(ctx).
 		PageNum(page).
@@ -104,7 +104,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 		IncludeCount(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list projects")
 	}
 
 	if projects == nil {
@@ -205,9 +205,9 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 }
 
 func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, _, err := p.client.MongoDBCloudUsersApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := p.client.MongoDBCloudUsersApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapError(err, "failed to list project users")
+		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list project users")
 	}
 
 	if members.Results == nil {
@@ -232,9 +232,9 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, _, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapError(err, "failed to list project database users")
+		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list project database users")
 	}
 
 	if members.Results == nil {
@@ -292,7 +292,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 	}
 
 	username := trait.GetLogin()
-	_, _, err = p.client.MongoDBCloudUsersApi.AddProjectUser(
+	_, resp, err := p.client.MongoDBCloudUsersApi.AddProjectUser(
 		ctx,
 		entitlement.Resource.Id.Resource,
 		&admin.GroupUserRequest{
@@ -301,8 +301,6 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err := wrapError(err, "failed to add user to project")
-
 		l.Error(
 			"failed to add user to project",
 			zap.Error(err),
@@ -310,7 +308,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 			zap.String("project_id", entitlement.Resource.Id.Resource),
 		)
 
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to add user to project")
 	}
 
 	return nil, nil
@@ -332,10 +330,8 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	_, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err := wrapError(err, "failed to remove user from project")
-
 		l.Error(
 			"failed to remove user from project",
 			zap.Error(err),
@@ -343,7 +339,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 			zap.String("project_id", grant.Entitlement.Resource.Id.Resource),
 		)
 
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to remove user from project")
 	}
 
 	return nil, nil

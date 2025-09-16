@@ -16,6 +16,10 @@ func wrapError(err error, message string) error {
 	return fmt.Errorf("mongo-db-connector: %s: %w", message, err)
 }
 
+func wrapErrorWithStatus(resp *http.Response, err error, message string) error {
+	return wrapError(parseToUHttpError(resp, err), message)
+}
+
 func getSkippEntitlementsAndGrantsAnnotations() annotations.Annotations {
 	annotations := annotations.Annotations{}
 	annotations.Update(&v2.SkipEntitlementsAndGrants{})

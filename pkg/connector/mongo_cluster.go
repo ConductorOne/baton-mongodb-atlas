@@ -56,7 +56,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		IncludeDeletedWithRetainedBackups(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, parseToUHttpError(resp, err)
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list clusters")
 	}
 
 	resources := make([]*v2.Resource, 0, len(response.GetResults()))

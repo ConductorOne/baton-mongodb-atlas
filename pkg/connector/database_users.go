@@ -64,9 +64,9 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if err != nil {
 		return nil, "", nil, err
 	}
-	users, _, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.GetResource()).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.GetResource()).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list database users")
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list database users")
 	}
 
 	if users.Results == nil {
@@ -114,9 +114,9 @@ func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.Resourc
 
 	groupId := parentResourceID.Resource
 
-	_, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupId, "admin", dbUserId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	resp, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupId, "admin", dbUserId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to delete database user")
 	}
 
 	return nil, nil

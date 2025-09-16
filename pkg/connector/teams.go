@@ -83,9 +83,9 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list teams")
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list organization teams")
 	}
 
 	if teams == nil {
@@ -145,9 +145,9 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		orgId = resource.GetParentResourceId().GetResource()
 	}
 
-	members, _, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list team members")
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list team members")
 	}
 
 	if members == nil {
@@ -198,7 +198,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		return nil, err
 	}
 
-	_, _, err = o.client.TeamsApi.AddTeamUser(
+	_, resp, err := o.client.TeamsApi.AddTeamUser(
 		ctx,
 		orgId,
 		teamId,
@@ -208,8 +208,6 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			},
 		}).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err := wrapError(err, "failed to add user to team")
-
 		l.Error(
 			"failed to add user to team",
 			zap.Error(err),
@@ -218,7 +216,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			zap.String("user_id", userId),
 		)
 
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to add user to team")
 	}
 
 	return nil, nil
@@ -246,10 +244,8 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, err
 	}
 
-	_, err = o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err := wrapError(err, "failed to remove user from team")
-
 		l.Error(
 			"failed to remove user from team",
 			zap.Error(err),
@@ -258,7 +254,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 			zap.String("user_id", userId),
 		)
 
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to remove user from team")
 	}
 
 	return nil, nil
