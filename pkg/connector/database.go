@@ -83,10 +83,10 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	// clusterID := splited[1]
 	clusterName := splited[2]
 
-	clusterInfo, _, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
+	clusterInfo, resp, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to get cluster")
 	}
 
 	connectionsStrings := clusterInfo.GetConnectionStrings()
@@ -124,12 +124,12 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	} else {
 		l.Info("using atlas api to list databases")
 
-		execute, _, err := o.client.MonitoringAndLogsApi.ListDatabases(ctx, groupID, process).
+		execute, resp, err := o.client.MonitoringAndLogsApi.ListDatabases(ctx, groupID, process).
 			PageNum(page).
 			ItemsPerPage(resourcePageSize).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list databases")
 		}
 
 		if execute.Results == nil || len(execute.GetResults()) == 0 {
@@ -234,11 +234,11 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 		return nil, "", nil, err
 	}
 
-	dbUsers, _, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, groupID).
+	dbUsers, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, groupID).
 		IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list database users")
 	}
 
 	if len(dbUsers.GetResults()) == 0 {
@@ -291,10 +291,10 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 
 	dbUsername := resource.Id.Resource
 
-	dbUser, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
+	dbUser, resp, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, wrapErrorWithStatus(resp, err, "failed to get database user")
 	}
 
 	for _, r := range dbUser.GetRoles() {
@@ -310,10 +310,10 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 
 	dbUser.Roles = &newRoles
 
-	_, _, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
+	_, resp, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, wrapErrorWithStatus(resp, err, "failed to update database user")
 	}
 
 	userId := &v2.ResourceId{
@@ -342,7 +342,7 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 
 	dbUsername := grant.Principal.Id.Resource
 
-	dbUser, _, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
+	dbUser, resp, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		if atlasErr, ok := admin.AsError(err); ok {
@@ -350,7 +350,7 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 				return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 			}
 		}
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to get database user")
 	}
 
 	// Remove the role from the user
@@ -369,17 +369,17 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 	}
 
 	if o.shouldDeleteUser(newRoles) {
-		_, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupID, "admin", dbUsername).
+		resp, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupID, "admin", dbUsername).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, err
+			return nil, wrapErrorWithStatus(resp, err, "failed to delete database user")
 		}
 	} else {
 		dbUser.Roles = &newRoles
-		_, _, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
+		_, resp, err := o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, err
+			return nil, wrapErrorWithStatus(resp, err, "failed to update database user")
 		}
 	}
 

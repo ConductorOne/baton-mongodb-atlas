@@ -73,9 +73,9 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		return nil, "", nil, err
 	}
 
-	organizations, _, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	organizations, resp, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list organizations")
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list organizations")
 	}
 
 	if organizations.Results == nil {
@@ -231,9 +231,9 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 
 	role := userRolesOrganizationEntitlementMapReversed[entitlement.Slug]
 
-	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	response, resp, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, wrapErrorWithStatus(resp, err, "failed to get organization user")
 	}
 
 	var newRoles []string
@@ -250,7 +250,7 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 
 	newRoles = append(newRoles, role)
 
-	_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
+	_, resp, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
 		ctx,
 		orgId,
 		userId,
@@ -264,7 +264,7 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, wrapErrorWithStatus(resp, err, "failed to update organization user")
 	}
 
 	newGrant := grant.NewGrant(resource, entitlement.Slug, &v2.ResourceId{
@@ -286,9 +286,9 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 	userId := grant.Principal.Id.Resource
 	role := userRolesOrganizationEntitlementMapReversed[grant.Entitlement.Slug]
 
-	response, _, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	response, resp, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to get organization user")
 	}
 
 	if response.Roles.OrgRoles == nil {
@@ -316,9 +316,12 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 			zap.String("userId", userId),
 		)
 
-		_, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		resp, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+		if err != nil {
+			return nil, wrapErrorWithStatus(resp, err, "failed to remove organization user")
+		}
 	} else {
-		_, _, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
+		_, resp, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
 			ctx,
 			orgId,
 			userId,
@@ -330,19 +333,18 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 				TeamIds: response.TeamIds,
 			},
 		).Execute() //nolint:bodyclose // The SDK handles closing the response body
-	}
-
-	if err != nil {
-		return nil, wrapError(err, "failed to remove user role for organization user")
+		if err != nil {
+			return nil, wrapErrorWithStatus(resp, err, "failed to update organization user")
+		}
 	}
 
 	return nil, nil
 }
 
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	teams, _, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapError(err, "failed to list teams")
+		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list organization teams")
 	}
 
 	if teams.Results == nil {
@@ -370,9 +372,9 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	projects, _, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	projects, resp, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapError(err, "failed to list projects")
+		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list projects")
 	}
 
 	if projects.Results == nil {
@@ -411,9 +413,9 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	users, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapError(err, "failed to list organization users")
+		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list organization users")
 	}
 
 	if users.Results == nil {

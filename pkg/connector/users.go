@@ -85,9 +85,9 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	users, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapError(err, "failed to list users")
+		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list users")
 	}
 
 	if users.Results == nil {
@@ -167,13 +167,15 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			return nil, nil, nil, err
 		}
 
+		var resp *http.Response
 		if userId != "" {
-			user, _, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+			user, resp, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", err)
+				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by id")
 			}
 		} else {
-			response, _, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgId).Username(email).Execute() //nolint:bodyclose // The SDK handles closing the response body
+			var result *admin.PaginatedOrgUser
+			result, resp, err = o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgId).Username(email).Execute() //nolint:bodyclose // The SDK handles closing the response body
 			if err != nil {
 				if atlasErr, ok := admin.AsError(err); ok {
 					switch atlasErr.ErrorCode {
@@ -184,14 +186,14 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 					}
 				}
 
-				return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", err)
+				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by username")
 			}
 
-			if response.Results == nil {
+			if result.Results == nil {
 				return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
 			}
 
-			for _, userResponse := range *response.Results {
+			for _, userResponse := range *result.Results {
 				if userResponse.GetUsername() == email {
 					user = &userResponse
 					break
@@ -212,7 +214,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	// TODO(golds): Needs to support more usernames
 	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-createdatabaseuser#operation-createdatabaseuser-body-application-vnd-atlas-2023-01-01-json-username
-	dbUser, _, err := o.client.DatabaseUsersApi.CreateDatabaseUser(
+	dbUser, resp, err := o.client.DatabaseUsersApi.CreateDatabaseUser(
 		ctx,
 		groupId,
 		&admin.CloudDatabaseUser{
@@ -233,7 +235,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			"failed to create database user",
 			zap.Error(err),
 		)
-		return nil, nil, nil, err
+		return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to create database user")
 	}
 
 	var resource *v2.Resource
@@ -286,9 +288,9 @@ func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, par
 
 	orgId := parentResourceID.Resource
 
-	_, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	resp, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, err
+		return nil, wrapErrorWithStatus(resp, err, "failed to remove organization user")
 	}
 
 	return nil, nil
@@ -346,7 +348,7 @@ func (o *userBuilder) createUserIfNotExists(ctx context.Context, orgId, email st
 			"failed to create organization invitation",
 			zap.Error(err),
 		)
-		return "", fmt.Errorf("failed to create organization invitation: %w", err)
+		return "", wrapErrorWithStatus(httpResponse, err, "failed to create organization invitation")
 	}
 
 	return orgUser.Id, nil
