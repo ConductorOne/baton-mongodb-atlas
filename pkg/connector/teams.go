@@ -208,6 +208,8 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			},
 		}).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		err = wrapErrorWithStatus(resp, err, "failed to add user to team")
+
 		l.Error(
 			"failed to add user to team",
 			zap.Error(err),
@@ -216,7 +218,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			zap.String("user_id", userId),
 		)
 
-		return nil, wrapErrorWithStatus(resp, err, "failed to add user to team")
+		return nil, err
 	}
 
 	return nil, nil
@@ -246,6 +248,8 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		err = wrapErrorWithStatus(resp, err, "failed to remove user from team")
+
 		l.Error(
 			"failed to remove user from team",
 			zap.Error(err),
@@ -254,7 +258,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 			zap.String("user_id", userId),
 		)
 
-		return nil, wrapErrorWithStatus(resp, err, "failed to remove user from team")
+		return nil, err
 	}
 
 	return nil, nil

@@ -301,6 +301,8 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		err = wrapErrorWithStatus(resp, err, "failed to add user to project")
+
 		l.Error(
 			"failed to add user to project",
 			zap.Error(err),
@@ -308,7 +310,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 			zap.String("project_id", entitlement.Resource.Id.Resource),
 		)
 
-		return nil, wrapErrorWithStatus(resp, err, "failed to add user to project")
+		return nil, err
 	}
 
 	return nil, nil
@@ -332,6 +334,8 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 
 	resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		err = wrapErrorWithStatus(resp, err, "failed to remove user from project")
+
 		l.Error(
 			"failed to remove user from project",
 			zap.Error(err),
@@ -339,7 +343,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 			zap.String("project_id", grant.Entitlement.Resource.Id.Resource),
 		)
 
-		return nil, wrapErrorWithStatus(resp, err, "failed to remove user from project")
+		return nil, err
 	}
 
 	return nil, nil
