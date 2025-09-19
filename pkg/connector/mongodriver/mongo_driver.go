@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
+
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -32,14 +34,20 @@ type MongoDriver struct {
 	// groupID -> clusterName -> userSessionTuple
 	accountsPerGroupId map[string]*userSessionTuple
 	clients            map[string]*mongo.Client
+	proxy              *mongoconfig.MongoProxy
 }
 
-func NewMongoDriver(adminClient *admin.APIClient, accountTTL time.Duration) *MongoDriver {
+func NewMongoDriver(
+	adminClient *admin.APIClient,
+	accountTTL time.Duration,
+	proxy *mongoconfig.MongoProxy,
+) *MongoDriver {
 	return &MongoDriver{
 		adminClient:        adminClient,
 		accountTTL:         accountTTL,
 		accountsPerGroupId: make(map[string]*userSessionTuple),
 		clients:            make(map[string]*mongo.Client),
+		proxy:              proxy,
 	}
 }
 
@@ -143,7 +151,25 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 	escapedPwd := url.QueryEscape(accountTuple.pass)
 
-	uri = fmt.Sprintf("mongodb+srv://%s:%s@%s", accountTuple.user.Username, escapedPwd, uri)
+	if m.proxy.Enabled() {
+		uri = fmt.Sprintf(
+			"mongodb+srv://%s:%s@%s?proxyHost=%s&proxyPort=%d&proxyUser=%s&proxyPass=%s",
+			accountTuple.user.Username,
+			escapedPwd,
+			uri,
+			m.proxy.Host,
+			m.proxy.Port,
+			url.QueryEscape(m.proxy.User),
+			url.QueryEscape(m.proxy.Pass),
+		)
+	} else {
+		uri = fmt.Sprintf(
+			"mongodb+srv://%s:%s@%s",
+			accountTuple.user.Username,
+			escapedPwd,
+			uri,
+		)
+	}
 
 	for i := 0; i < 10; i++ {
 		l.Info("Trying to connect to MongoDB", zap.Int("retry", i))
