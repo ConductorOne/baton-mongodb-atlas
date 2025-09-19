@@ -126,7 +126,7 @@ func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.CredentialOptions) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
+func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.LocalCredentialOptions) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
 	var err error
@@ -205,7 +205,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	}
 
 	l.Info("creating database user", zap.String("userId", userId))
-	password, err := crypto.GeneratePassword(credentialOptions)
+	password, err := crypto.GeneratePassword(ctx, credentialOptions)
 	if err != nil {
 		return nil, nil, nil, err
 	}

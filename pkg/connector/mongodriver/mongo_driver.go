@@ -44,9 +44,9 @@ func NewMongoDriver(adminClient *admin.APIClient, accountTTL time.Duration) *Mon
 }
 
 func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.CloudDatabaseUser, string, error) {
-	password, err := crypto.GeneratePassword(&v2.CredentialOptions{
-		Options: &v2.CredentialOptions_RandomPassword_{
-			RandomPassword: &v2.CredentialOptions_RandomPassword{
+	password, err := crypto.GeneratePassword(ctx, &v2.LocalCredentialOptions{
+		Options: &v2.LocalCredentialOptions_RandomPassword_{
+			RandomPassword: &v2.LocalCredentialOptions_RandomPassword{
 				Length: 30,
 			},
 		},
