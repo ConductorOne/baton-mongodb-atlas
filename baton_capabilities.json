@@ -30,7 +30,8 @@
         "description": "A MongoDB Atlas Database User"
       },
       "capabilities": [
-        "CAPABILITY_SYNC"
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
       ]
     },
     {
@@ -106,14 +107,16 @@
       },
       "capabilities": [
         "CAPABILITY_SYNC",
-        "CAPABILITY_ACCOUNT_PROVISIONING"
+        "CAPABILITY_ACCOUNT_PROVISIONING",
+        "CAPABILITY_RESOURCE_DELETE"
       ]
     }
   ],
   "connectorCapabilities": [
     "CAPABILITY_PROVISION",
     "CAPABILITY_SYNC",
-    "CAPABILITY_ACCOUNT_PROVISIONING"
+    "CAPABILITY_ACCOUNT_PROVISIONING",
+    "CAPABILITY_RESOURCE_DELETE"
   ],
   "credentialDetails": {
     "capabilityAccountProvisioning": {
