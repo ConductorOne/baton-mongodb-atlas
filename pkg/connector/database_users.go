@@ -2,12 +2,15 @@ package connector
 
 import (
 	"context"
-	"errors"
+	"fmt"
+
+	"google.golang.org/grpc/codes"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
@@ -109,7 +112,7 @@ func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.Resourc
 	dbUserId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, errors.New("database user must have a parent resource")
+		return nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: database user must have a parent resource", fmt.Errorf("parent resource ID is nil"))
 	}
 
 	groupId := parentResourceID.Resource

@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/grpc/codes"
+
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
@@ -181,7 +184,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	userId := principal.Id.Resource
 	if principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
+		err := uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: only users can be granted to teams", fmt.Errorf("expected %s, got %s", userResourceType.Id, principal.Id.ResourceType))
 
 		l.Warn(
 			"mongodb connector: only users can be granted to teams",
@@ -195,7 +198,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	orgId, teamId, err := parseTeamResourceId(entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, err
+		return nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: failed to parse team resource ID", err)
 	}
 
 	_, resp, err := o.client.TeamsApi.AddTeamUser(
@@ -229,7 +232,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	userId := grant.Principal.Id.Resource
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be removed from teams")
+		err := uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: only users can be removed from teams", fmt.Errorf("expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType))
 
 		l.Warn(
 			"mongodb connector: only users can be removed from teams",
@@ -243,7 +246,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	orgId, teamId, err := parseTeamResourceId(grant.Entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, err
+		return nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: failed to parse team resource ID", err)
 	}
 
 	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body

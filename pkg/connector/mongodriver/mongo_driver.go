@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/grpc/codes"
 
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 
@@ -52,12 +54,12 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 		},
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, "", uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate password", err)
 	}
 
 	id, err := randomString(10)
 	if err != nil {
-		return nil, "", err
+		return nil, "", uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate random string", err)
 	}
 
 	username := "baton_mongodb_atlas_" + id
@@ -86,7 +88,7 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 	).Execute()
 
 	if err != nil {
-		return nil, "", err
+		return nil, "", uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to create database user", err)
 	}
 
 	return dbUser, password, nil
@@ -99,7 +101,7 @@ func (m *MongoDriver) Close(ctx context.Context) error {
 	for _, client := range m.clients {
 		err := client.Disconnect(ctx)
 		if err != nil {
-			return err
+			return uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to disconnect mongo client", err)
 		}
 	}
 
@@ -116,7 +118,7 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 	if !ok {
 		user, password, err := m.createUser(ctx, groupID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to create mongo driver user", err)
 		}
 
 		accountTuple = &userSessionTuple{
@@ -138,7 +140,7 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 	uri, err := m.connectionString(ctx, groupID, clusterName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to get connection string", err)
 	}
 
 	escapedPwd := url.QueryEscape(accountTuple.pass)
@@ -177,7 +179,7 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		return accountTuple.user, client, nil
 	}
 
-	return nil, nil, fmt.Errorf("failed to connect to MongoDB after multiple attempts")
+	return nil, nil, uhttp.WrapErrors(codes.DeadlineExceeded, "mongo-db-connector: failed to connect to MongoDB after multiple attempts")
 }
 
 func (m *MongoDriver) connectionString(ctx context.Context, groupID, clusterName string) (string, error) {
@@ -186,12 +188,12 @@ func (m *MongoDriver) connectionString(ctx context.Context, groupID, clusterName
 	clusterInfo, _, err := m.adminClient.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute()
 	if err != nil {
-		return "", err
+		return "", uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to get cluster", err)
 	}
 
 	if clusterInfo.ConnectionStrings.StandardSrv == nil {
 		l.Error("Cluster does not have a standard connection string", zap.Any("clusterInfo", clusterInfo))
-		return "", fmt.Errorf("cluster %s does not have a standard connection string", clusterName)
+		return "", uhttp.WrapErrors(codes.Internal, "mongo-db-connector: cluster does not have a standard connection string", fmt.Errorf("cluster %s", clusterName))
 	}
 
 	return strings.TrimPrefix(*clusterInfo.ConnectionStrings.StandardSrv, "mongodb+srv://"), nil
