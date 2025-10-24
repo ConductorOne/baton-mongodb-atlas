@@ -8,12 +8,14 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
@@ -43,12 +45,12 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	}
 
 	if parentResourceID.ResourceType != databaseResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: invalid parent resource type", fmt.Errorf("expected %s, got %s", databaseResourceType.Id, parentResourceID.ResourceType))
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: %s", parentResourceID.Resource)
+		return nil, "", nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: invalid parent resource ID", fmt.Errorf("resource ID %s does not have expected format", parentResourceID.Resource))
 	}
 
 	groupID := splited[0]
@@ -58,7 +60,7 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	_, client, err := o.mongodriver.Connect(ctx, groupID, clusterName)
 	if err != nil {
 		l.Error("failed to connect to MongoDB Atlas cluster", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
-		return nil, "", nil, err
+		return nil, "", nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to connect to MongoDB Atlas cluster", err)
 	}
 
 	db := client.Database(dbName, nil)
@@ -71,7 +73,7 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 			return nil, "", nil, nil
 		}
 
-		return nil, "", nil, err
+		return nil, "", nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to list collection names", err)
 	}
 
 	resources := make([]*v2.Resource, 0)

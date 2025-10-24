@@ -2,14 +2,16 @@ package connector
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
+
+	"google.golang.org/grpc/codes"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
@@ -37,7 +39,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	}
 
 	if parentResourceID.ResourceType != projectResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: invalid parent resource type", fmt.Errorf("expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType))
 	}
 
 	currentPage := 1
@@ -45,7 +47,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if pToken != nil && pToken.Token != "" {
 		tempPage, err := strconv.Atoi(pToken.Token)
 		if err != nil {
-			return nil, "", nil, errors.Join(errors.New("invalid pagination token"), err)
+			return nil, "", nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: invalid pagination token", err)
 		}
 
 		currentPage = tempPage

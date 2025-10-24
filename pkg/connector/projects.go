@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
@@ -115,7 +118,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 	for _, project := range *projects.Results {
 		resource, err := newProjectResource(ctx, parentResourceID, project)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, wrapError(err, "failed to create project resource")
 		}
 
 		resources = append(resources, resource)
@@ -259,7 +262,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 
 	if principal.Id.ResourceType != userResourceType.Id &&
 		principal.Id.ResourceType != databaseUserResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be granted to projects: %s", principal.Id.ResourceType)
+		err := uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: only users can be granted to projects", fmt.Errorf("expected %s or %s, got %s", userResourceType.Id, databaseUserResourceType.Id, principal.Id.ResourceType))
 
 		l.Warn(
 			"mongodb connector: only users can be granted to projects",
@@ -273,12 +276,12 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 
 	trait, err := rs.GetUserTrait(principal)
 	if err != nil {
-		return nil, err
+		return nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: failed to get user trait", err)
 	}
 
 	var entitlementSlug string
 	if slug, ok := projectEntitlementsUserRolesMap[entitlement.Slug]; !ok {
-		err := fmt.Errorf("mongodb connector: unknown entitlement %s", entitlement.Slug)
+		err := uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: unknown entitlement", fmt.Errorf("entitlement %s is not recognized", entitlement.Slug))
 
 		l.Warn(
 			"mongodb connector: unknown entitlement",
@@ -320,7 +323,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 	l := ctxzap.Extract(ctx)
 
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be revoked from projects")
+		err := uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: only users can be revoked from projects", fmt.Errorf("expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType))
 
 		l.Warn(
 			"mongodb connector: only users can be revoked from projects",
