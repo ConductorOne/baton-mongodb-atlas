@@ -115,7 +115,7 @@ func (p *projectBuilder) List(ctx context.Context, parentResourceID *v2.Resource
 	for _, project := range *projects.Results {
 		resource, err := newProjectResource(ctx, parentResourceID, project)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, wrapError(err, "failed to create project resource")
 		}
 
 		resources = append(resources, resource)
@@ -259,7 +259,7 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 
 	if principal.Id.ResourceType != userResourceType.Id &&
 		principal.Id.ResourceType != databaseUserResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be granted to projects: %s", principal.Id.ResourceType)
+		err := wrapError(fmt.Errorf("expected %s or %s, got %s", userResourceType.Id, databaseUserResourceType.Id, principal.Id.ResourceType), "only users can be granted to projects")
 
 		l.Warn(
 			"mongodb connector: only users can be granted to projects",
@@ -273,12 +273,12 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 
 	trait, err := rs.GetUserTrait(principal)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err, "failed to get user trait")
 	}
 
 	var entitlementSlug string
 	if slug, ok := projectEntitlementsUserRolesMap[entitlement.Slug]; !ok {
-		err := fmt.Errorf("mongodb connector: unknown entitlement %s", entitlement.Slug)
+		err := wrapError(fmt.Errorf("entitlement %s is not recognized", entitlement.Slug), "unknown entitlement")
 
 		l.Warn(
 			"mongodb connector: unknown entitlement",
@@ -320,7 +320,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 	l := ctxzap.Extract(ctx)
 
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be revoked from projects")
+		err := wrapError(fmt.Errorf("expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType), "only users can be revoked from projects")
 
 		l.Warn(
 			"mongodb connector: only users can be revoked from projects",

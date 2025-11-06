@@ -181,7 +181,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	userId := principal.Id.Resource
 	if principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be granted to teams")
+		err := wrapError(fmt.Errorf("expected %s, got %s", userResourceType.Id, principal.Id.ResourceType), "only users can be granted to teams")
 
 		l.Warn(
 			"mongodb connector: only users can be granted to teams",
@@ -195,7 +195,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	orgId, teamId, err := parseTeamResourceId(entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err, "failed to parse team resource ID")
 	}
 
 	_, resp, err := o.client.TeamsApi.AddTeamUser(
@@ -229,7 +229,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	userId := grant.Principal.Id.Resource
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := fmt.Errorf("mongodb connector: only users can be removed from teams")
+		err := wrapError(fmt.Errorf("expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType), "only users can be removed from teams")
 
 		l.Warn(
 			"mongodb connector: only users can be removed from teams",
@@ -243,7 +243,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	orgId, teamId, err := parseTeamResourceId(grant.Entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err, "failed to parse team resource ID")
 	}
 
 	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body

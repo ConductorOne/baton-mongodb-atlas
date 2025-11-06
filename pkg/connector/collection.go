@@ -43,12 +43,12 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	}
 
 	if parentResourceID.ResourceType != databaseResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, wrapError(fmt.Errorf("expected %s, got %s", databaseResourceType.Id, parentResourceID.ResourceType), "invalid parent resource type")
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: %s", parentResourceID.Resource)
+		return nil, "", nil, wrapError(fmt.Errorf("resource ID %s does not have expected format", parentResourceID.Resource), "invalid parent resource ID")
 	}
 
 	groupID := splited[0]
@@ -58,7 +58,7 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	_, client, err := o.mongodriver.Connect(ctx, groupID, clusterName)
 	if err != nil {
 		l.Error("failed to connect to MongoDB Atlas cluster", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
-		return nil, "", nil, err
+		return nil, "", nil, wrapError(err, "failed to connect to MongoDB Atlas cluster")
 	}
 
 	db := client.Database(dbName, nil)
@@ -71,7 +71,7 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 			return nil, "", nil, nil
 		}
 
-		return nil, "", nil, err
+		return nil, "", nil, wrapError(err, "failed to list collection names")
 	}
 
 	resources := make([]*v2.Resource, 0)

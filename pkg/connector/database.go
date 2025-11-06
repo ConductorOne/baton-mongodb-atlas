@@ -66,17 +66,17 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	}
 
 	if parentResourceID.ResourceType != mongoClusterResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, wrapError(fmt.Errorf("expected %s, got %s", mongoClusterResourceType.Id, parentResourceID.ResourceType), "invalid parent resource type")
 	}
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapError(err, "failed to parse page token")
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: %s", parentResourceID.Resource)
+		return nil, "", nil, wrapError(fmt.Errorf("resource ID %s does not have expected format", parentResourceID.Resource), "invalid parent resource ID")
 	}
 
 	groupID := splited[0]
@@ -97,7 +97,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	connectionString := strings.Split(*connectionsStrings.Standard, ",")
 	if len(connectionString) == 0 {
-		return nil, "", nil, fmt.Errorf("cluster %s does not have a valid connection string", clusterName)
+		return nil, "", nil, wrapError(fmt.Errorf("cluster %s", clusterName), "cluster does not have a valid connection string")
 	}
 	process := strings.TrimPrefix(connectionString[0], "mongodb://")
 
@@ -117,7 +117,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			NameOnly:            boolPointer(true),
 		})
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, wrapError(err, "failed to list database names")
 		}
 
 		databases = names
@@ -161,7 +161,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	if !o.enableMongoDriver {
 		nextPage, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, wrapError(err, "failed to generate page token")
 		}
 	}
 
@@ -224,14 +224,14 @@ func (o *databaseBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	splited := strings.Split(resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid resource ID: %s", resource.Id.Resource)
+		return nil, "", nil, wrapError(fmt.Errorf("resource ID %s does not have expected format", resource.Id.Resource), "invalid resource ID")
 	}
 
 	groupID := splited[0]
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapError(err, "failed to parse page token")
 	}
 
 	dbUsers, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, groupID).
@@ -268,7 +268,7 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, wrapError(err, "failed to generate page token")
 	}
 
 	return grants, nextPage, nil, nil
@@ -276,13 +276,13 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
 	if resource.Id.ResourceType != databaseUserResourceType.Id {
-		return nil, nil, fmt.Errorf("invalid resource type: %s", resource.Id.ResourceType)
+		return nil, nil, wrapError(fmt.Errorf("expected %s, got %s", databaseUserResourceType.Id, resource.Id.ResourceType), "invalid resource type")
 	}
 
 	// We want database Id
 	splited := strings.Split(entitlement.Resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, nil, fmt.Errorf("invalid resource ID: %s", resource.Id.Resource)
+		return nil, nil, wrapError(fmt.Errorf("resource ID %s does not have expected format", resource.Id.Resource), "invalid resource ID")
 	}
 
 	groupID := splited[0]
@@ -328,12 +328,12 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 
 func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	if grant.Principal.Id.ResourceType != databaseUserResourceType.Id {
-		return nil, fmt.Errorf("invalid resource type: %s", grant.Principal.Id.ResourceType)
+		return nil, wrapError(fmt.Errorf("expected %s, got %s", databaseUserResourceType.Id, grant.Principal.Id.ResourceType), "invalid resource type")
 	}
 
 	splited := strings.Split(grant.Entitlement.Resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, fmt.Errorf("invalid resource ID: %s", grant.Entitlement.Resource.Id.Resource)
+		return nil, wrapError(fmt.Errorf("resource ID %s does not have expected format", grant.Entitlement.Resource.Id.Resource), "invalid resource ID")
 	}
 
 	groupID := splited[0]

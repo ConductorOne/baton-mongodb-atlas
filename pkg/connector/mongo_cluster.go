@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -37,7 +36,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	}
 
 	if parentResourceID.ResourceType != projectResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, wrapError(fmt.Errorf("expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType), "invalid parent resource type")
 	}
 
 	currentPage := 1
@@ -45,7 +44,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if pToken != nil && pToken.Token != "" {
 		tempPage, err := strconv.Atoi(pToken.Token)
 		if err != nil {
-			return nil, "", nil, errors.Join(errors.New("invalid pagination token"), err)
+			return nil, "", nil, wrapError(err, "invalid pagination token")
 		}
 
 		currentPage = tempPage

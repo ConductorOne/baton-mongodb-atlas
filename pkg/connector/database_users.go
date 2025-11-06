@@ -2,7 +2,7 @@ package connector
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -109,7 +109,7 @@ func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.Resourc
 	dbUserId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, errors.New("database user must have a parent resource")
+		return nil, wrapError(fmt.Errorf("parent resource ID is nil"), "database user must have a parent resource")
 	}
 
 	groupId := parentResourceID.Resource

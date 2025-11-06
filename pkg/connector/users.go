@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
@@ -135,17 +135,17 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	orgId, ok := profile["organizationId"].(string)
 	if orgId == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("organizationId is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: organizationId is required", fmt.Errorf("organizationId field is missing or empty"))
 	}
 
 	groupId, ok := profile["groupId"].(string)
 	if groupId == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("groupId is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: groupId is required", fmt.Errorf("groupId field is missing or empty"))
 	}
 
 	username, ok := profile["username"].(string)
 	if username == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: username is required", fmt.Errorf("username field is missing or empty"))
 	}
 
 	var userId string
@@ -154,7 +154,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	if o.createInviteKey {
 		email, ok := profile["email"].(string)
 		if email == "" || !ok {
-			return nil, nil, annotations.Annotations{}, fmt.Errorf("email is empty")
+			return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: email is required", fmt.Errorf("email field is missing or empty"))
 		}
 
 		l.Info("creating organization user")
@@ -190,7 +190,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			}
 
 			if result.Results == nil {
-				return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
+				return nil, nil, nil, uhttp.WrapErrors(codes.NotFound, "mongo-db-connector: user not found", fmt.Errorf("user '%s' not found, results is nil", email))
 			}
 
 			for _, userResponse := range *result.Results {
@@ -207,7 +207,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	l.Info("creating database user", zap.String("userId", userId))
 	password, err := crypto.GeneratePassword(ctx, credentialOptions)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate password", err)
 	}
 
 	defaultDatabase := "admin"
@@ -249,7 +249,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			user,
 		)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, wrapError(err, "failed to create user resource")
 		}
 	} else {
 		resource, err = newDatabaseUserResource(
@@ -283,7 +283,7 @@ func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, par
 	userId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, errors.New("parent resource id is empty")
+		return nil, wrapError(fmt.Errorf("parent resource id is empty"), "parent resource id is required")
 	}
 
 	orgId := parentResourceID.Resource
