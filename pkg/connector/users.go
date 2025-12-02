@@ -87,7 +87,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list users")
+		return nil, "", nil, fmt.Errorf("failed to list users: %w", parseToUHttpError(resp, err))
 	}
 
 	if users.Results == nil {
@@ -98,7 +98,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	for _, user := range *users.Results {
 		resource, err := newUserResource(ctx, parentResourceID, &user)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create user resource")
+			return nil, "", nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -171,7 +171,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		if userId != "" {
 			user, resp, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 			if err != nil {
-				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by id")
+				return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", parseToUHttpError(resp, err))
 			}
 		} else {
 			var result *admin.PaginatedOrgUser
@@ -186,7 +186,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 					}
 				}
 
-				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by username")
+				return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", parseToUHttpError(resp, err))
 			}
 
 			if result.Results == nil {
@@ -235,7 +235,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			"failed to create database user",
 			zap.Error(err),
 		)
-		return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to create database user")
+		return nil, nil, nil, fmt.Errorf("failed to create database user: %w", parseToUHttpError(resp, err))
 	}
 
 	var resource *v2.Resource
@@ -249,7 +249,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			user,
 		)
 		if err != nil {
-			return nil, nil, nil, wrapError(err, "failed to create user resource")
+			return nil, nil, nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 	} else {
 		resource, err = newDatabaseUserResource(
@@ -283,14 +283,14 @@ func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, par
 	userId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, wrapError(fmt.Errorf("parent resource id is empty"), "parent resource id is required")
+		return nil, fmt.Errorf("parent resource id is required: parent resource id is empty")
 	}
 
 	orgId := parentResourceID.Resource
 
 	resp, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, wrapErrorWithStatus(resp, err, "failed to remove organization user")
+		return nil, fmt.Errorf("failed to remove organization user: %w", parseToUHttpError(resp, err))
 	}
 
 	return nil, nil
@@ -348,7 +348,7 @@ func (o *userBuilder) createUserIfNotExists(ctx context.Context, orgId, email st
 			"failed to create organization invitation",
 			zap.Error(err),
 		)
-		return "", wrapErrorWithStatus(httpResponse, err, "failed to create organization invitation")
+		return "", fmt.Errorf("failed to create organization invitation: %w", parseToUHttpError(httpResponse, err))
 	}
 
 	return orgUser.Id, nil

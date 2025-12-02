@@ -85,7 +85,7 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list organization teams")
+		return nil, "", nil, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
 	}
 
 	if teams == nil {
@@ -96,7 +96,7 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	for _, team := range *teams.Results {
 		resource, err := newTeamResource(ctx, parentResourceID, team)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create team resource")
+			return nil, "", nil, fmt.Errorf("failed to create team resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -147,7 +147,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 
 	members, resp, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list team members")
+		return nil, "", nil, fmt.Errorf("failed to list team members: %w", parseToUHttpError(resp, err))
 	}
 
 	if members == nil {
@@ -158,7 +158,7 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	for _, member := range *members.Results {
 		userResource, err := newUserResource(ctx, resource.ParentResourceId, &member)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create user resource")
+			return nil, "", nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
@@ -181,7 +181,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	userId := principal.Id.Resource
 	if principal.Id.ResourceType != userResourceType.Id {
-		err := wrapError(fmt.Errorf("expected %s, got %s", userResourceType.Id, principal.Id.ResourceType), "only users can be granted to teams")
+		err := fmt.Errorf("only users can be granted to teams: expected %s, got %s", userResourceType.Id, principal.Id.ResourceType)
 
 		l.Warn(
 			"mongodb connector: only users can be granted to teams",
@@ -195,7 +195,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	orgId, teamId, err := parseTeamResourceId(entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, wrapError(err, "failed to parse team resource ID")
+		return nil, fmt.Errorf("failed to parse team resource ID: %w", err)
 	}
 
 	_, resp, err := o.client.TeamsApi.AddTeamUser(
@@ -208,7 +208,7 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			},
 		}).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err = wrapErrorWithStatus(resp, err, "failed to add user to team")
+		err = fmt.Errorf("failed to add user to team: %w", parseToUHttpError(resp, err))
 
 		l.Error(
 			"failed to add user to team",
@@ -229,7 +229,7 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	userId := grant.Principal.Id.Resource
 	if grant.Principal.Id.ResourceType != userResourceType.Id {
-		err := wrapError(fmt.Errorf("expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType), "only users can be removed from teams")
+		err := fmt.Errorf("only users can be removed from teams: expected %s, got %s", userResourceType.Id, grant.Principal.Id.ResourceType)
 
 		l.Warn(
 			"mongodb connector: only users can be removed from teams",
@@ -243,12 +243,12 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	orgId, teamId, err := parseTeamResourceId(grant.Entitlement.GetResource().GetId().GetResource())
 	if err != nil {
-		return nil, wrapError(err, "failed to parse team resource ID")
+		return nil, fmt.Errorf("failed to parse team resource ID: %w", err)
 	}
 
 	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err = wrapErrorWithStatus(resp, err, "failed to remove user from team")
+		err = fmt.Errorf("failed to remove user from team: %w", parseToUHttpError(resp, err))
 
 		l.Error(
 			"failed to remove user from team",

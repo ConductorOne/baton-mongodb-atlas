@@ -75,7 +75,7 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 
 	organizations, resp, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list organizations")
+		return nil, "", nil, fmt.Errorf("failed to list organizations: %w", parseToUHttpError(resp, err))
 	}
 
 	if organizations.Results == nil {
@@ -86,7 +86,7 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	for _, organization := range *organizations.Results {
 		resource, err := newOrganizationResource(organization)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create organization resource")
+			return nil, "", nil, fmt.Errorf("failed to create organization resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -233,7 +233,7 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 
 	response, resp, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, wrapErrorWithStatus(resp, err, "failed to get organization user")
+		return nil, nil, fmt.Errorf("failed to get organization user: %w", parseToUHttpError(resp, err))
 	}
 
 	var newRoles []string
@@ -264,7 +264,7 @@ func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, 
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 
 	if err != nil {
-		return nil, nil, wrapErrorWithStatus(resp, err, "failed to update organization user")
+		return nil, nil, fmt.Errorf("failed to update organization user: %w", parseToUHttpError(resp, err))
 	}
 
 	newGrant := grant.NewGrant(resource, entitlement.Slug, &v2.ResourceId{
@@ -288,7 +288,7 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 
 	response, resp, err := o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, wrapErrorWithStatus(resp, err, "failed to get organization user")
+		return nil, fmt.Errorf("failed to get organization user: %w", parseToUHttpError(resp, err))
 	}
 
 	if response.Roles.OrgRoles == nil {
@@ -318,7 +318,7 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 
 		resp, err = o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, wrapErrorWithStatus(resp, err, "failed to remove organization user")
+			return nil, fmt.Errorf("failed to remove organization user: %w", parseToUHttpError(resp, err))
 		}
 	} else {
 		_, resp, err = o.client.MongoDBCloudUsersApi.UpdateOrganizationUser(
@@ -334,7 +334,7 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 			},
 		).Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, wrapErrorWithStatus(resp, err, "failed to update organization user")
+			return nil, fmt.Errorf("failed to update organization user: %w", parseToUHttpError(resp, err))
 		}
 	}
 
@@ -344,7 +344,7 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list organization teams")
+		return nil, 0, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
 	}
 
 	if teams.Results == nil {
@@ -355,7 +355,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 	for _, team := range *teams.Results {
 		teamResource, err := newTeamResource(ctx, orgResource.Id, team)
 		if err != nil {
-			return nil, *teams.TotalCount, wrapError(err, "failed to create team grant")
+			return nil, *teams.TotalCount, fmt.Errorf("failed to create team grant: %w", err)
 		}
 
 		g := grant.NewGrant(
@@ -374,7 +374,7 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	projects, resp, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list projects")
+		return nil, 0, fmt.Errorf("failed to list projects: %w", parseToUHttpError(resp, err))
 	}
 
 	if projects.Results == nil {
@@ -389,7 +389,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 
 		projectResource, err := newProjectResource(ctx, orgResource.Id, project)
 		if err != nil {
-			return nil, *projects.TotalCount, wrapError(err, "failed to create project grant")
+			return nil, *projects.TotalCount, fmt.Errorf("failed to create project grant: %w", err)
 		}
 
 		g := grant.NewGrant(
@@ -415,7 +415,7 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
 	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, 0, wrapErrorWithStatus(resp, err, "failed to list organization users")
+		return nil, 0, fmt.Errorf("failed to list organization users: %w", parseToUHttpError(resp, err))
 	}
 
 	if users.Results == nil {
@@ -426,7 +426,7 @@ func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Re
 	for _, user := range *users.Results {
 		userResource, err := newUserResource(ctx, orgResource.Id, &user)
 		if err != nil {
-			return nil, *users.TotalCount, wrapError(err, "failed to create user resource")
+			return nil, *users.TotalCount, fmt.Errorf("failed to create user resource: %w", err)
 		}
 
 		for _, roleName := range *user.Roles.OrgRoles {

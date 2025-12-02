@@ -36,7 +36,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	}
 
 	if parentResourceID.ResourceType != projectResourceType.Id {
-		return nil, "", nil, wrapError(fmt.Errorf("expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType), "invalid parent resource type")
+		return nil, "", nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType)
 	}
 
 	currentPage := 1
@@ -44,7 +44,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	if pToken != nil && pToken.Token != "" {
 		tempPage, err := strconv.Atoi(pToken.Token)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "invalid pagination token")
+			return nil, "", nil, fmt.Errorf("invalid pagination token: %w", err)
 		}
 
 		currentPage = tempPage
@@ -55,7 +55,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		IncludeDeletedWithRetainedBackups(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list clusters")
+		return nil, "", nil, fmt.Errorf("failed to list clusters: %w", parseToUHttpError(resp, err))
 	}
 
 	resources := make([]*v2.Resource, 0, len(response.GetResults()))
@@ -63,7 +63,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	for _, cluster := range response.GetResults() {
 		resource, err := newMongoClusterResource(cluster, parentResourceID, o.enableSyncDatabases)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create resource")
+			return nil, "", nil, fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		resources = append(resources, resource)
