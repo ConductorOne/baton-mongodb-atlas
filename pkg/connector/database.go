@@ -66,17 +66,17 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	}
 
 	if parentResourceID.ResourceType != mongoClusterResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: %s", parentResourceID.ResourceType)
+		return nil, "", nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", mongoClusterResourceType.Id, parentResourceID.ResourceType)
 	}
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, fmt.Errorf("failed to parse page token: %w", err)
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: %s", parentResourceID.Resource)
+		return nil, "", nil, fmt.Errorf("invalid parent resource ID: resource ID %s does not have expected format", parentResourceID.Resource)
 	}
 
 	groupID := splited[0]
@@ -86,7 +86,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	clusterInfo, resp, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to get cluster")
+		return nil, "", nil, fmt.Errorf("failed to get cluster: %w", parseToUHttpError(resp, err))
 	}
 
 	connectionsStrings := clusterInfo.GetConnectionStrings()
@@ -97,7 +97,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	connectionString := strings.Split(*connectionsStrings.Standard, ",")
 	if len(connectionString) == 0 {
-		return nil, "", nil, fmt.Errorf("cluster %s does not have a valid connection string", clusterName)
+		return nil, "", nil, fmt.Errorf("cluster does not have a valid connection string: cluster %s", clusterName)
 	}
 	process := strings.TrimPrefix(connectionString[0], "mongodb://")
 
@@ -117,7 +117,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			NameOnly:            boolPointer(true),
 		})
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, fmt.Errorf("failed to list database names: %w", err)
 		}
 
 		databases = names
@@ -129,7 +129,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			ItemsPerPage(resourcePageSize).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list databases")
+			return nil, "", nil, fmt.Errorf("failed to list databases: %w", parseToUHttpError(resp, err))
 		}
 
 		if execute.Results == nil || len(execute.GetResults()) == 0 {
@@ -151,7 +151,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 		resource, err := newDatabaseResource(groupID, clusterName, database, parentResourceID, o.enableMongoDriver)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create resource")
+			return nil, "", nil, fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -161,7 +161,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	if !o.enableMongoDriver {
 		nextPage, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", nil, fmt.Errorf("failed to generate page token: %w", err)
 		}
 	}
 
@@ -224,21 +224,21 @@ func (o *databaseBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	splited := strings.Split(resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid resource ID: %s", resource.Id.Resource)
+		return nil, "", nil, fmt.Errorf("invalid resource ID: resource ID %s does not have expected format", resource.Id.Resource)
 	}
 
 	groupID := splited[0]
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, fmt.Errorf("failed to parse page token: %w", err)
 	}
 
 	dbUsers, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, groupID).
 		IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list database users")
+		return nil, "", nil, fmt.Errorf("failed to list database users: %w", parseToUHttpError(resp, err))
 	}
 
 	if len(dbUsers.GetResults()) == 0 {
@@ -268,7 +268,7 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, fmt.Errorf("failed to generate page token: %w", err)
 	}
 
 	return grants, nextPage, nil, nil
@@ -276,13 +276,13 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
 	if resource.Id.ResourceType != databaseUserResourceType.Id {
-		return nil, nil, fmt.Errorf("invalid resource type: %s", resource.Id.ResourceType)
+		return nil, nil, fmt.Errorf("invalid resource type: expected %s, got %s", databaseUserResourceType.Id, resource.Id.ResourceType)
 	}
 
 	// We want database Id
 	splited := strings.Split(entitlement.Resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, nil, fmt.Errorf("invalid resource ID: %s", resource.Id.Resource)
+		return nil, nil, fmt.Errorf("invalid resource ID: resource ID %s does not have expected format", resource.Id.Resource)
 	}
 
 	groupID := splited[0]
@@ -294,7 +294,7 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 	dbUser, resp, err := o.client.DatabaseUsersApi.GetDatabaseUser(ctx, groupID, "admin", dbUsername).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, wrapErrorWithStatus(resp, err, "failed to get database user")
+		return nil, nil, fmt.Errorf("failed to get database user: %w", parseToUHttpError(resp, err))
 	}
 
 	for _, r := range dbUser.GetRoles() {
@@ -313,7 +313,7 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 	_, resp, err = o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, wrapErrorWithStatus(resp, err, "failed to update database user")
+		return nil, nil, fmt.Errorf("failed to update database user: %w", parseToUHttpError(resp, err))
 	}
 
 	userId := &v2.ResourceId{
@@ -328,12 +328,12 @@ func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, enti
 
 func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	if grant.Principal.Id.ResourceType != databaseUserResourceType.Id {
-		return nil, fmt.Errorf("invalid resource type: %s", grant.Principal.Id.ResourceType)
+		return nil, fmt.Errorf("invalid resource type: expected %s, got %s", databaseUserResourceType.Id, grant.Principal.Id.ResourceType)
 	}
 
 	splited := strings.Split(grant.Entitlement.Resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, fmt.Errorf("invalid resource ID: %s", grant.Entitlement.Resource.Id.Resource)
+		return nil, fmt.Errorf("invalid resource ID: resource ID %s does not have expected format", grant.Entitlement.Resource.Id.Resource)
 	}
 
 	groupID := splited[0]
@@ -350,7 +350,7 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 				return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 			}
 		}
-		return nil, wrapErrorWithStatus(resp, err, "failed to get database user")
+		return nil, fmt.Errorf("failed to get database user: %w", parseToUHttpError(resp, err))
 	}
 
 	// Remove the role from the user
@@ -372,14 +372,14 @@ func (o *databaseBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotati
 		resp, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupID, "admin", dbUsername).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, wrapErrorWithStatus(resp, err, "failed to delete database user")
+			return nil, fmt.Errorf("failed to delete database user: %w", parseToUHttpError(resp, err))
 		}
 	} else {
 		dbUser.Roles = &newRoles
 		_, resp, err := o.client.DatabaseUsersApi.UpdateDatabaseUser(ctx, groupID, "admin", dbUsername, dbUser).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, wrapErrorWithStatus(resp, err, "failed to update database user")
+			return nil, fmt.Errorf("failed to update database user: %w", parseToUHttpError(resp, err))
 		}
 	}
 

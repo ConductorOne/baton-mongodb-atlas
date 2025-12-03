@@ -52,12 +52,12 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 		},
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to generate password: %w", err)
 	}
 
 	id, err := randomString(10)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to generate random string: %w", err)
 	}
 
 	username := "baton_mongodb_atlas_" + id
@@ -86,7 +86,7 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 	).Execute()
 
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to create database user: %w", err)
 	}
 
 	return dbUser, password, nil
@@ -99,7 +99,7 @@ func (m *MongoDriver) Close(ctx context.Context) error {
 	for _, client := range m.clients {
 		err := client.Disconnect(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to disconnect mongo client: %w", err)
 		}
 	}
 
@@ -186,7 +186,7 @@ func (m *MongoDriver) connectionString(ctx context.Context, groupID, clusterName
 	clusterInfo, _, err := m.adminClient.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get cluster: %w", err)
 	}
 
 	if clusterInfo.ConnectionStrings.StandardSrv == nil {

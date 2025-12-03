@@ -2,7 +2,7 @@ package connector
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -66,7 +66,7 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	}
 	users, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, parentResourceID.GetResource()).IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list database users")
+		return nil, "", nil, fmt.Errorf("failed to list database users: %w", parseToUHttpError(resp, err))
 	}
 
 	if users.Results == nil {
@@ -77,7 +77,7 @@ func (o *databaseUserBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	for _, user := range *users.Results {
 		resource, err := newDatabaseUserResource(ctx, parentResourceID, user)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create database user resource")
+			return nil, "", nil, fmt.Errorf("failed to create database user resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -109,14 +109,14 @@ func (o *databaseUserBuilder) Delete(ctx context.Context, resourceId *v2.Resourc
 	dbUserId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, errors.New("database user must have a parent resource")
+		return nil, fmt.Errorf("database user must have a parent resource: parent resource ID is nil")
 	}
 
 	groupId := parentResourceID.Resource
 
 	resp, err := o.client.DatabaseUsersApi.DeleteDatabaseUser(ctx, groupId, "admin", dbUserId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, wrapErrorWithStatus(resp, err, "failed to delete database user")
+		return nil, fmt.Errorf("failed to delete database user: %w", parseToUHttpError(resp, err))
 	}
 
 	return nil, nil

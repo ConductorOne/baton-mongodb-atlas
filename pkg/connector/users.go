@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
@@ -87,7 +87,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, wrapErrorWithStatus(resp, err, "failed to list users")
+		return nil, "", nil, fmt.Errorf("failed to list users: %w", parseToUHttpError(resp, err))
 	}
 
 	if users.Results == nil {
@@ -98,7 +98,7 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	for _, user := range *users.Results {
 		resource, err := newUserResource(ctx, parentResourceID, &user)
 		if err != nil {
-			return nil, "", nil, wrapError(err, "failed to create user resource")
+			return nil, "", nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -135,17 +135,17 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	orgId, ok := profile["organizationId"].(string)
 	if orgId == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("organizationId is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: organizationId is required", fmt.Errorf("organizationId field is missing or empty"))
 	}
 
 	groupId, ok := profile["groupId"].(string)
 	if groupId == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("groupId is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: groupId is required", fmt.Errorf("groupId field is missing or empty"))
 	}
 
 	username, ok := profile["username"].(string)
 	if username == "" || !ok {
-		return nil, nil, annotations.Annotations{}, fmt.Errorf("username is empty")
+		return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: username is required", fmt.Errorf("username field is missing or empty"))
 	}
 
 	var userId string
@@ -154,7 +154,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	if o.createInviteKey {
 		email, ok := profile["email"].(string)
 		if email == "" || !ok {
-			return nil, nil, annotations.Annotations{}, fmt.Errorf("email is empty")
+			return nil, nil, annotations.Annotations{}, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: email is required", fmt.Errorf("email field is missing or empty"))
 		}
 
 		l.Info("creating organization user")
@@ -171,7 +171,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		if userId != "" {
 			user, resp, err = o.client.MongoDBCloudUsersApi.GetOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 			if err != nil {
-				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by id")
+				return nil, nil, nil, fmt.Errorf("failed to get user by id: %w", parseToUHttpError(resp, err))
 			}
 		} else {
 			var result *admin.PaginatedOrgUser
@@ -186,11 +186,11 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 					}
 				}
 
-				return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to get user by username")
+				return nil, nil, nil, fmt.Errorf("failed to get user by username: %w", parseToUHttpError(resp, err))
 			}
 
 			if result.Results == nil {
-				return nil, nil, nil, fmt.Errorf("user '%s' not found, results is nil", email)
+				return nil, nil, nil, uhttp.WrapErrors(codes.NotFound, "mongo-db-connector: user not found", fmt.Errorf("user '%s' not found, results is nil", email))
 			}
 
 			for _, userResponse := range *result.Results {
@@ -207,7 +207,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 	l.Info("creating database user", zap.String("userId", userId))
 	password, err := crypto.GeneratePassword(ctx, credentialOptions)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate password", err)
 	}
 
 	defaultDatabase := "admin"
@@ -235,7 +235,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			"failed to create database user",
 			zap.Error(err),
 		)
-		return nil, nil, nil, wrapErrorWithStatus(resp, err, "failed to create database user")
+		return nil, nil, nil, fmt.Errorf("failed to create database user: %w", parseToUHttpError(resp, err))
 	}
 
 	var resource *v2.Resource
@@ -249,7 +249,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			user,
 		)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 	} else {
 		resource, err = newDatabaseUserResource(
@@ -283,14 +283,14 @@ func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, par
 	userId := resourceId.Resource
 
 	if parentResourceID == nil {
-		return nil, errors.New("parent resource id is empty")
+		return nil, fmt.Errorf("parent resource id is required: parent resource id is empty")
 	}
 
 	orgId := parentResourceID.Resource
 
 	resp, err := o.client.MongoDBCloudUsersApi.RemoveOrganizationUser(ctx, orgId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, wrapErrorWithStatus(resp, err, "failed to remove organization user")
+		return nil, fmt.Errorf("failed to remove organization user: %w", parseToUHttpError(resp, err))
 	}
 
 	return nil, nil
@@ -348,7 +348,7 @@ func (o *userBuilder) createUserIfNotExists(ctx context.Context, orgId, email st
 			"failed to create organization invitation",
 			zap.Error(err),
 		)
-		return "", wrapErrorWithStatus(httpResponse, err, "failed to create organization invitation")
+		return "", fmt.Errorf("failed to create organization invitation: %w", parseToUHttpError(httpResponse, err))
 	}
 
 	return orgUser.Id, nil
