@@ -1,5 +1,12 @@
 name: ci
-on: pull_request
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  push:
+    branches:
+      - main
+
 jobs:
   go-lint:
     runs-on: ubuntu-latest
@@ -29,9 +36,9 @@ jobs:
         with:
           go-version-file: go.mod
       - name: go tests
-        run: go test -v -covermode=count -json ./... > test.json
+        run: (set -o pipefail && go test -v -covermode=count -json ./... | tee test.json)
       - name: annotate go tests
         if: always()
-        uses: guyarb/golang-test-annotations@v0.5.1
+        uses: guyarb/golang-test-annotations@v0.8.0
         with:
           test-results: test.json
