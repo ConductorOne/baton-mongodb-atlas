@@ -103,6 +103,16 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 			},
 			Order: 6,
 		},
+		"authType": {
+			DisplayName: "Authentication Type",
+			Required:    false,
+			Description: "The authentication method for the database user. Defaults to SCRAM-SHA (password-based). Options: SCRAM-SHA, AWS_IAM_USER, X509_CUSTOMER, X509_MANAGED, LDAP_USER, OIDC_WORKLOAD.",
+			Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+				StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+			},
+			Placeholder: "SCRAM-SHA",
+			Order:       7,
+		},
 	}
 
 	if d.createInviteKey {
