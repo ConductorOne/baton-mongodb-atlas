@@ -1,3 +1,0 @@
-FROM public.ecr.aws/lambda/provided:al2023
-ENTRYPOINT ["/baton-mongodb-atlas", "lambda"]
-COPY baton-mongodb-atlas /
