@@ -251,7 +251,7 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			}
 
 			if user == nil {
-				l.Info("user were not found by username, creating database user instead", zap.String("email", email))
+				l.Info("user was not found by username, creating database user instead", zap.String("email", email))
 			}
 		}
 	}
@@ -304,31 +304,26 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 
 	case AuthTypeAWSIAMUser:
 		// AWS IAM User authentication - username must be an AWS ARN
-		awsIAMType := dbTypeUser
-		dbUserRequest.AwsIAMType = &awsIAMType
+		dbUserRequest.AwsIAMType = strPtr(dbTypeUser)
 
 	case AuthTypeX509Customer:
 		// Customer-managed X.509 certificate - username must be RFC 2253 Distinguished Name
-		x509Type := "CUSTOMER"
-		dbUserRequest.X509Type = &x509Type
+		dbUserRequest.X509Type = strPtr("CUSTOMER")
 
 	case AuthTypeX509Managed:
 		// MongoDB Atlas-managed X.509 certificate - username must be RFC 2253 Distinguished Name
-		x509Type := "MANAGED"
-		dbUserRequest.X509Type = &x509Type
+		dbUserRequest.X509Type = strPtr("MANAGED")
 
 	case AuthTypeLDAPUser:
 		// LDAP User authentication - username must be RFC 2253 Distinguished Name
-		ldapAuthType := dbTypeUser
-		dbUserRequest.LdapAuthType = &ldapAuthType
+		dbUserRequest.LdapAuthType = strPtr(dbTypeUser)
 
 	case AuthTypeOIDCWorkload:
 		// OIDC Workload authentication - username format: <Atlas OIDC IdP ID>/<IdP user identifier>
-		oidcAuthType := dbTypeUser
-		dbUserRequest.OidcAuthType = &oidcAuthType
+		dbUserRequest.OidcAuthType = strPtr(dbTypeUser)
 
 	default:
-		return nil, nil, nil, uhttp.WrapErrors(codes.InvalidArgument, "mongo-db-connector: unsupported authentication type", fmt.Errorf("unsupported authType: %s", authType))
+		return nil, nil, nil, uhttp.WrapErrors(codes.InvalidArgument, fmt.Sprintf("mongo-db-connector: unsupported authentication type: %s", authType))
 	}
 
 	l.Info("creating database user",

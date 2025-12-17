@@ -83,3 +83,10 @@ func parseToUHttpError(resp *http.Response, err error) error {
 		err,
 	)
 }
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
