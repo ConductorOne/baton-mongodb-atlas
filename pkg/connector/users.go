@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,6 +19,57 @@ import (
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
 )
+
+// Database user authentication types.
+// These constants define the supported authentication methods for MongoDB Atlas database users.
+const (
+	// AuthTypeScramSHA is the default password-based authentication.
+	// Username can be any string. DatabaseName should be "admin".
+	AuthTypeScramSHA = "SCRAM-SHA"
+
+	// AuthTypeAWSIAMUser authenticates using AWS IAM user credentials.
+	// Username must be an AWS ARN. DatabaseName should be "$external".
+	AuthTypeAWSIAMUser = "AWS_IAM_USER"
+
+	// AuthTypeX509Customer authenticates using customer-managed X.509 certificates.
+	// Username must be an RFC 2253 Distinguished Name. DatabaseName should be "$external".
+	AuthTypeX509Customer = "X509_CUSTOMER"
+
+	// AuthTypeX509Managed authenticates using MongoDB Atlas-managed X.509 certificates.
+	// Username must be an RFC 2253 Distinguished Name. DatabaseName should be "$external".
+	AuthTypeX509Managed = "X509_MANAGED"
+
+	// AuthTypeLDAPUser authenticates using LDAP user credentials.
+	// Username must be an RFC 2253 Distinguished Name. DatabaseName should be "$external".
+	AuthTypeLDAPUser = "LDAP_USER"
+
+	// AuthTypeOIDCWorkload authenticates using OIDC workload identity.
+	// Username format: Atlas OIDC IdP ID followed by '/' and the IdP user identifier.
+	// DatabaseName should be "$external".
+	AuthTypeOIDCWorkload = "OIDC_WORKLOAD"
+)
+
+// databaseNameAdmin is used for SCRAM-SHA authentication.
+const databaseNameAdmin = "admin"
+
+// databaseNameExternal is used for external authentication methods (AWS IAM, x.509, LDAP, OIDC Workload).
+const databaseNameExternal = "$external"
+
+// dbTypeUser is the value used for user-based authentication in AWS IAM, LDAP, and OIDC.
+const dbTypeUser = "USER"
+
+// getDatabaseNameForAuthType returns the appropriate database name for the given authentication type.
+func getDatabaseNameForAuthType(authType string) string {
+	switch authType {
+	case AuthTypeScramSHA:
+		return databaseNameAdmin
+	case AuthTypeAWSIAMUser, AuthTypeX509Customer, AuthTypeX509Managed, AuthTypeLDAPUser, AuthTypeOIDCWorkload:
+		return databaseNameExternal
+	default:
+		// Default to admin for backwards compatibility (SCRAM-SHA)
+		return databaseNameAdmin
+	}
+}
 
 type atlasUserResponse interface {
 	GetId() string
@@ -200,35 +250,92 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 				}
 			}
 
-			l.Info("user were not found by username, creating database user instead", zap.String("email", email))
+			if user == nil {
+				l.Info("user was not found by username, creating database user instead", zap.String("email", email))
+			}
 		}
 	}
 
 	l.Info("creating database user", zap.String("userId", userId))
-	password, err := crypto.GeneratePassword(ctx, credentialOptions)
-	if err != nil {
-		return nil, nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate password", err)
+
+	// Get the authentication type from the profile, default to SCRAM-SHA
+	authType, ok := profile["authType"].(string)
+	if authType == "" || !ok {
+		authType = AuthTypeScramSHA
 	}
 
-	defaultDatabase := "admin"
+	// Determine the database name based on authentication type
+	databaseName := getDatabaseNameForAuthType(authType)
 
-	// TODO(golds): Needs to support more usernames
-	// https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-createdatabaseuser#operation-createdatabaseuser-body-application-vnd-atlas-2023-01-01-json-username
+	// Build the CloudDatabaseUser with the appropriate auth type fields
+	dbUserRequest := &admin.CloudDatabaseUser{
+		GroupId:      groupId,
+		Username:     username,
+		DatabaseName: databaseName,
+		Roles: &[]admin.DatabaseUserRole{
+			{
+				DatabaseName: databaseNameAdmin,
+				RoleName:     "read",
+			},
+		},
+	}
+
+	var password string
+	var plaintextData []*v2.PlaintextData
+
+	// Set the appropriate authentication type fields
+	// See: https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/operation/operation-createdatabaseuser
+	switch authType {
+	case AuthTypeScramSHA:
+		// SCRAM-SHA requires a password
+		password, err = crypto.GeneratePassword(ctx, credentialOptions)
+		if err != nil {
+			return nil, nil, nil, uhttp.WrapErrors(codes.Internal, "mongo-db-connector: failed to generate password", err)
+		}
+		dbUserRequest.Password = &password
+		plaintextData = []*v2.PlaintextData{
+			{
+				Name:        "password",
+				Description: "The password for the database user",
+				Schema:      "text/plain",
+				Bytes:       []byte(password),
+			},
+		}
+
+	case AuthTypeAWSIAMUser:
+		// AWS IAM User authentication - username must be an AWS ARN
+		dbUserRequest.AwsIAMType = strPtr(dbTypeUser)
+
+	case AuthTypeX509Customer:
+		// Customer-managed X.509 certificate - username must be RFC 2253 Distinguished Name
+		dbUserRequest.X509Type = strPtr("CUSTOMER")
+
+	case AuthTypeX509Managed:
+		// MongoDB Atlas-managed X.509 certificate - username must be RFC 2253 Distinguished Name
+		dbUserRequest.X509Type = strPtr("MANAGED")
+
+	case AuthTypeLDAPUser:
+		// LDAP User authentication - username must be RFC 2253 Distinguished Name
+		dbUserRequest.LdapAuthType = strPtr(dbTypeUser)
+
+	case AuthTypeOIDCWorkload:
+		// OIDC Workload authentication - username format: <Atlas OIDC IdP ID>/<IdP user identifier>
+		dbUserRequest.OidcAuthType = strPtr(dbTypeUser)
+
+	default:
+		return nil, nil, nil, uhttp.WrapErrors(codes.InvalidArgument, fmt.Sprintf("mongo-db-connector: unsupported authentication type: %s", authType))
+	}
+
+	l.Info("creating database user",
+		zap.String("authType", authType),
+		zap.String("databaseName", databaseName),
+		zap.String("username", username),
+	)
+
 	dbUser, resp, err := o.client.DatabaseUsersApi.CreateDatabaseUser(
 		ctx,
 		groupId,
-		&admin.CloudDatabaseUser{
-			GroupId:      groupId,
-			Password:     &password,
-			Username:     username,
-			DatabaseName: defaultDatabase,
-			Roles: &[]admin.DatabaseUserRole{
-				{
-					DatabaseName: defaultDatabase,
-					RoleName:     "read",
-				},
-			},
-		},
+		dbUserRequest,
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		l.Error(
@@ -267,15 +374,6 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 		Resource:              resource,
 	}
 
-	plaintextData := []*v2.PlaintextData{
-		{
-			Name:        "password",
-			Description: "The password for the database user",
-			Schema:      "text/plain",
-			Bytes:       []byte(password),
-		},
-	}
-
 	return response, plaintextData, nil, err
 }
 
@@ -297,17 +395,22 @@ func (o *userBuilder) Delete(ctx context.Context, resourceId *v2.ResourceId, par
 }
 
 func parseStrList(strFrom any, defaultValue []string) *[]string {
-	str, ok := strFrom.(string)
+	strList, ok := strFrom.([]interface{})
 	if !ok {
 		return &defaultValue
 	}
-
-	if str == "" {
+	finalStrList := make([]string, 0, len(strList))
+	for _, v := range strList {
+		strItem, ok := v.(string)
+		if !ok {
+			return &defaultValue
+		}
+		finalStrList = append(finalStrList, strItem)
+	}
+	if len(finalStrList) == 0 {
 		return &defaultValue
 	}
-
-	temp := strings.Split(strings.TrimSpace(str), ",")
-	return &temp
+	return &finalStrList
 }
 
 func (o *userBuilder) CreateAccountCapabilityDetails(ctx context.Context) (*v2.CredentialDetailsAccountProvisioning, annotations.Annotations, error) {
@@ -321,7 +424,6 @@ func (o *userBuilder) CreateAccountCapabilityDetails(ctx context.Context) (*v2.C
 
 func (o *userBuilder) createUserIfNotExists(ctx context.Context, orgId, email string, profile map[string]any) (string, error) {
 	l := ctxzap.Extract(ctx)
-
 	orgUser, httpResponse, err := o.client.MongoDBCloudUsersApi.CreateOrganizationUser(
 		ctx,
 		orgId,
