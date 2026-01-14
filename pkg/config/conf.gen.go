@@ -12,8 +12,6 @@ type Mongodbatlas struct {
 	DeleteDatabaseUserWithReadOnly bool `mapstructure:"delete-database-user-with-read-only"`
 	MongoProxyHost string `mapstructure:"mongo-proxy-host"`
 	MongoProxyPort int `mapstructure:"mongo-proxy-port"`
-	MongoProxyUser string `mapstructure:"mongo-proxy-user"`
-	MongoProxyPass string `mapstructure:"mongo-proxy-pass"`
 }
 
 func (c* Mongodbatlas) findFieldByTag(tagValue string) (any, bool) {

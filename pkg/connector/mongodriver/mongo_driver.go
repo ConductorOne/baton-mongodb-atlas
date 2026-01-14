@@ -3,15 +3,13 @@ package mongodriver
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
-
-	"go.mongodb.org/mongo-driver/mongo/options"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 
@@ -19,6 +17,9 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"golang.org/x/net/proxy"
 )
 
 type userSessionTuple struct {
@@ -26,12 +27,18 @@ type userSessionTuple struct {
 	user *admin.CloudDatabaseUser
 }
 
+type contextDialerFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
+func (f contextDialerFunc) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return f(ctx, network, address)
+}
+
 type MongoDriver struct {
 	adminClient *admin.APIClient
 	accountTTL  time.Duration
 	mutex       sync.Mutex
 
-	// groupID -> clusterName -> userSessionTuple
+	// groupID -> userSessionTuple
 	accountsPerGroupId map[string]*userSessionTuple
 	clients            map[string]*mongo.Client
 	proxy              *mongoconfig.MongoProxy
@@ -71,7 +78,6 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 	username := "baton_mongodb_atlas_" + id
 
 	deletedTime := time.Now().UTC().Add(m.accountTTL)
-
 	userDescription := "Created by Baton, Automatically deleted after " + deletedTime.Format(time.RFC3339)
 
 	dbUser, _, err := m.adminClient.DatabaseUsersApi.CreateDatabaseUser(
@@ -92,7 +98,6 @@ func (m *MongoDriver) createUser(ctx context.Context, groupId string) (*admin.Cl
 			},
 		},
 	).Execute()
-
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create database user: %w", err)
 	}
@@ -110,8 +115,36 @@ func (m *MongoDriver) Close(ctx context.Context) error {
 			return fmt.Errorf("failed to disconnect mongo client: %w", err)
 		}
 	}
-
 	return nil
+}
+
+func (m *MongoDriver) socks5Dialer() (options.ContextDialer, error) {
+	if m.proxy == nil || !m.proxy.Enabled() {
+		return nil, nil
+	}
+
+	base := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	socksDialer, err := proxy.SOCKS5(
+		"tcp",
+		fmt.Sprintf("%s:%d", m.proxy.Host, m.proxy.Port),
+		nil,
+		base,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create socks5 dialer: %w", err)
+	}
+
+	if cd, ok := socksDialer.(proxy.ContextDialer); ok {
+		return contextDialerFunc(cd.DialContext), nil
+	}
+
+	return contextDialerFunc(func(ctx context.Context, network, address string) (net.Conn, error) {
+		return socksDialer.Dial(network, address)
+	}), nil
 }
 
 func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) (*admin.CloudDatabaseUser, *mongo.Client, error) {
@@ -126,17 +159,14 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		if err != nil {
 			return nil, nil, err
 		}
-
 		accountTuple = &userSessionTuple{
 			user: user,
 			pass: password,
 		}
-
 		m.accountsPerGroupId[groupID] = accountTuple
 	}
 
 	clientKey := fmt.Sprintf("%s-%s", groupID, clusterName)
-
 	client, ok := m.clients[clientKey]
 	if ok {
 		return accountTuple.user, client, nil
@@ -144,44 +174,34 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 	time.Sleep(time.Second * 5) // Wait for the user to be fully created and available
 
-	uri, err := m.connectionString(ctx, groupID, clusterName)
+	host, err := m.connectionString(ctx, groupID, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	escapedPwd := url.QueryEscape(accountTuple.pass)
+	uri := fmt.Sprintf("mongodb+srv://%s:%s@%s", accountTuple.user.Username, escapedPwd, host)
 
-	if m.proxy.Enabled() {
-		uri = fmt.Sprintf(
-			"mongodb+srv://%s:%s@%s?proxyHost=%s&proxyPort=%d&proxyUser=%s&proxyPass=%s",
-			accountTuple.user.Username,
-			escapedPwd,
-			uri,
-			m.proxy.Host,
-			m.proxy.Port,
-			url.QueryEscape(m.proxy.User),
-			url.QueryEscape(m.proxy.Pass),
-		)
-	} else {
-		uri = fmt.Sprintf(
-			"mongodb+srv://%s:%s@%s",
-			accountTuple.user.Username,
-			escapedPwd,
-			uri,
-		)
+	dialer, err := m.socks5Dialer()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	for i := 0; i < 10; i++ {
 		l.Info("Trying to connect to MongoDB", zap.Int("retry", i))
 
-		opts := options.Client().ApplyURI(uri).
+		opts := options.Client().
+			ApplyURI(uri).
 			SetMaxConnIdleTime(60 * time.Second).
 			SetMaxPoolSize(10)
+
+		if dialer != nil {
+			opts.SetDialer(dialer)
+		}
 
 		client, err := mongo.Connect(ctx, opts)
 		if err != nil {
 			l.Error("Failed to connect to MongoDB", zap.Error(err))
-
 			time.Sleep(time.Second * 2) // Retry after a delay
 			continue
 		}
@@ -199,7 +219,6 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		}
 
 		m.clients[clientKey] = client
-
 		return accountTuple.user, client, nil
 	}
 

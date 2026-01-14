@@ -52,8 +52,6 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 	mProxy := &mongoconfig.MongoProxy{
 		Host: cc.MongoProxyHost,
 		Port: cc.MongoProxyPort,
-		User: cc.MongoProxyUser,
-		Pass: cc.MongoProxyPass,
 	}
 
 	cb, err := connector.New(
