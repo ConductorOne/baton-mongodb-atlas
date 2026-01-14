@@ -50,6 +50,20 @@ var DeleteDatabaseUserWithReadOnly = field.BoolField(
 	field.WithDefaultValue(false),
 )
 
+var MongoProxyHost = field.StringField(
+	"mongo-proxy-host",
+	field.WithDisplayName("Mongo Proxy Host"),
+	field.WithDescription("The host of the MongoDB proxy server."),
+	// field.WithExportTarget(field.ExportTargetOps), // TODO(lauren) add this back
+)
+
+var MongoProxyPort = field.IntField(
+	"mongo-proxy-port",
+	field.WithDisplayName("Mongo Proxy Port"),
+	field.WithDescription("The port of the MongoDB proxy server."),
+	// field.WithExportTarget(field.ExportTargetOps), // TODO(lauren) add this back
+)
+
 //go:generate go run ./gen
 var Config = field.NewConfiguration(
 	[]field.SchemaField{
@@ -59,6 +73,9 @@ var Config = field.NewConfiguration(
 		EnableSyncDatabases,
 		EnableMongoDriver,
 		DeleteDatabaseUserWithReadOnly,
+		// Proxy fields
+		MongoProxyHost,
+		MongoProxyPort,
 	},
 	field.WithConnectorDisplayName("MongodbAtlas"),
 	field.WithHelpUrl("/docs/baton/mongodb-atlas"),

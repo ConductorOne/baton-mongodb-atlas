@@ -11,6 +11,7 @@ require (
 	go.mongodb.org/atlas-sdk/v20250312006 v20250312006.0.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/zap v1.27.0
+	golang.org/x/net v0.35.0
 	google.golang.org/grpc v1.71.0
 )
 
@@ -115,7 +116,6 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	golang.org/x/crypto v0.34.0 // indirect
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
-	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect

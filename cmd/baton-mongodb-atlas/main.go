@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
+
 	cfg "github.com/conductorone/baton-mongodb-atlas/pkg/config"
 
 	configschema "github.com/conductorone/baton-sdk/pkg/config"
@@ -47,6 +49,11 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 		return nil, err
 	}
 
+	mProxy := &mongoconfig.MongoProxy{
+		Host: cc.MongoProxyHost,
+		Port: cc.MongoProxyPort,
+	}
+
 	cb, err := connector.New(
 		ctx,
 		cc.PublicKey,
@@ -55,6 +62,7 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 		cc.EnableSyncDatabases,
 		cc.EnableMongoDriver,
 		cc.DeleteDatabaseUserWithReadOnly,
+		mProxy,
 	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
