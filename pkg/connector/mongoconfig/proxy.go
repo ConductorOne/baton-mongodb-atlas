@@ -31,7 +31,7 @@ func (p *MongoProxy) Dialer() (proxy.ContextDialer, error) {
 	}
 
 	base := &net.Dialer{
-		Timeout:   30 * time.Second,
+		Timeout:   60 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
 
