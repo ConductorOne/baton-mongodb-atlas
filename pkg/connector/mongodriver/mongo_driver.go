@@ -175,6 +175,10 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 
 		if dialer != nil {
 			opts.SetDialer(dialer)
+			// Increase timeouts when using SOCKS5 proxy since connections take longer:
+			// proxy connect -> SOCKS5 handshake -> proxy connects to MongoDB -> TLS handshake
+			opts.SetConnectTimeout(60 * time.Second)
+			opts.SetServerSelectionTimeout(60 * time.Second)
 		}
 
 		client, err := mongo.Connect(ctx, opts)
