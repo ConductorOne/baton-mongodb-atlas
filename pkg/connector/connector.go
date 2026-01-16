@@ -2,12 +2,17 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/mongodb-forks/digest"
+	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -147,7 +152,39 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 
 // New returns a new instance of the connector.
 func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool, mProxy *mongoconfig.MongoProxy) (*MongoDB, error) {
-	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
+	l := ctxzap.Extract(ctx)
+	clientModifiers := []admin.ClientModifier{}
+
+	// If proxy is enabled, create an HTTP client that routes through SOCKS5
+	if mProxy != nil && mProxy.Enabled() {
+		l.Info(
+			"Configuring SOCKS5 proxy for Atlas API",
+			zap.String("proxy_address", mProxy.Address()),
+		)
+
+		httpTransport, err := mProxy.HTTPTransport()
+		if err != nil {
+			l.Error("Failed to create SOCKS5 HTTP transport", zap.Error(err))
+			return nil, fmt.Errorf("failed to create SOCKS5 HTTP transport: %w", err)
+		}
+
+		// Wrap the SOCKS5 transport with digest auth
+		digestTransport := digest.NewTransportWithHTTPRoundTripper(publicKey, privateKey, httpTransport)
+		httpClient, err := digestTransport.Client()
+		if err != nil {
+			l.Error("Failed to create digest HTTP client", zap.Error(err))
+			return nil, fmt.Errorf("failed to create digest HTTP client: %w", err)
+		}
+
+		clientModifiers = append(clientModifiers, admin.UseHTTPClient(httpClient))
+		l.Info("Atlas API client configured to use SOCKS5 proxy")
+	} else {
+		l.Debug("No proxy configured, using direct connection for Atlas API")
+		// No proxy, use standard digest auth
+		clientModifiers = append(clientModifiers, admin.UseDigestAuth(publicKey, privateKey))
+	}
+
+	client, err := admin.NewClient(clientModifiers...)
 	if err != nil {
 		return nil, err
 	}
