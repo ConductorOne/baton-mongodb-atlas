@@ -23,14 +23,13 @@ var CreateInviteKeyField = field.BoolField(
 	"create-invite-key",
 	field.WithDisplayName("Create Invite"),
 	field.WithDescription("If enabled, Baton will create invites for users that do not have an account in MongoDB Atlas when provisioning."),
-	field.WithRequired(false),
+	field.WithDefaultValue(true),
 )
 
 var EnableSyncDatabases = field.BoolField(
 	"enable-sync-databases",
 	field.WithDisplayName("Sync Databases"),
 	field.WithDescription("If enabled, Baton will sync database users and roles."),
-	field.WithRequired(false),
 	field.WithDefaultValue(true),
 )
 
@@ -38,7 +37,6 @@ var EnableMongoDriver = field.BoolField(
 	"enable-mongo-driver",
 	field.WithDisplayName("Enable Mongo Driver"),
 	field.WithDescription("If enabled, Baton will use the MongoDB Go Driver to fetch database collections."),
-	field.WithRequired(false),
 	field.WithDefaultValue(false),
 )
 
@@ -46,7 +44,6 @@ var DeleteDatabaseUserWithReadOnly = field.BoolField(
 	"delete-database-user-with-read-only",
 	field.WithDisplayName("Enable Delete Database User when only having read@admin"),
 	field.WithDescription("If enabled, Baton will delete database users that only have read@admin role when revoking access."),
-	field.WithRequired(false),
 	field.WithDefaultValue(false),
 )
 
@@ -77,7 +74,7 @@ var Config = field.NewConfiguration(
 		MongoProxyHost,
 		MongoProxyPort,
 	},
-	field.WithConnectorDisplayName("MongodbAtlas"),
+	field.WithConnectorDisplayName("MongoDB Atlas"),
 	field.WithHelpUrl("/docs/baton/mongodb-atlas"),
 	field.WithIconUrl("/static/app-icons/mongodb.svg"),
 	field.WithConstraints(
