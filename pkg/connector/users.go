@@ -59,7 +59,8 @@ const databaseNameExternal = "$external"
 const dbTypeUser = "USER"
 
 const userStatusActive = "ACTIVE"
-const userStatusPending = "PENDING"
+
+// const userStatusPending = "PENDING"
 
 // getDatabaseNameForAuthType returns the appropriate database name for the given authentication type.
 func getDatabaseNameForAuthType(authType string) string {
