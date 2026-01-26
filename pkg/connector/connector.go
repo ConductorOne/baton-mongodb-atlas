@@ -145,6 +145,19 @@ func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error)
 	return nil, nil
 }
 
+// Close cleans up any resources held by the connector, including MongoDB client connections.
+// This implements io.Closer to allow proper cleanup after sync operations complete.
+// Without this, MongoDB driver goroutines (connection pools, RTT monitors, etc.) will leak.
+func (d *MongoDB) Close() error {
+	if d.mongodriver != nil {
+		return d.mongodriver.Close(context.Background())
+	}
+	return nil
+}
+
+// Ensure MongoDB implements io.Closer at compile time.
+var _ io.Closer = (*MongoDB)(nil)
+
 // New returns a new instance of the connector.
 func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool, mProxy *mongoconfig.MongoProxy) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
