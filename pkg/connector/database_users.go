@@ -30,7 +30,7 @@ func newDatabaseUserResource(ctx context.Context, projectId *v2.ResourceId, user
 	userTraits := []rs.UserTraitOption{
 		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.Username),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
+		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED), // The only possible state for this type of user.
 	}
 
 	resource, err := rs.NewUserResource(

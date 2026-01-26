@@ -58,6 +58,9 @@ const databaseNameExternal = "$external"
 // dbTypeUser is the value used for user-based authentication in AWS IAM, LDAP, and OIDC.
 const dbTypeUser = "USER"
 
+const userStatusActive = "ACTIVE"
+const userStatusPending = "PENDING"
+
 // getDatabaseNameForAuthType returns the appropriate database name for the given authentication type.
 func getDatabaseNameForAuthType(authType string) string {
 	switch authType {
@@ -91,7 +94,12 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 }
 
 func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user atlasUserResponse) (*v2.Resource, error) {
+	userStatus := v2.UserTrait_Status_STATUS_UNSPECIFIED
 	userId := user.GetId()
+
+	if user.GetOrgMembershipStatus() == userStatusActive {
+		userStatus = v2.UserTrait_Status_STATUS_ENABLED
+	} // userStatusPending will remain as UNSPECIFIED, since we don't have a specific state for those cases.
 
 	profile := map[string]interface{}{
 		"first_name": user.GetFirstName(),
@@ -106,7 +114,7 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.GetUsername()),
 		rs.WithEmail(user.GetUsername(), true),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
+		rs.WithStatus(userStatus),
 	}
 
 	resource, err := rs.NewUserResource(
