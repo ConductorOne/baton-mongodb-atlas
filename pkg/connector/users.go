@@ -60,7 +60,7 @@ const dbTypeUser = "USER"
 
 const userStatusActive = "ACTIVE"
 
-// const userStatusPending = "PENDING"
+const userStatusPending = "PENDING"
 
 // getDatabaseNameForAuthType returns the appropriate database name for the given authentication type.
 func getDatabaseNameForAuthType(authType string) string {
@@ -95,12 +95,7 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 }
 
 func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user atlasUserResponse) (*v2.Resource, error) {
-	userStatus := v2.UserTrait_Status_STATUS_UNSPECIFIED
 	userId := user.GetId()
-
-	if user.GetOrgMembershipStatus() == userStatusActive {
-		userStatus = v2.UserTrait_Status_STATUS_ENABLED
-	} // userStatusPending will remain as UNSPECIFIED, since we don't have a specific state for those cases.
 
 	profile := map[string]interface{}{
 		"first_name": user.GetFirstName(),
@@ -115,7 +110,15 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.GetUsername()),
 		rs.WithEmail(user.GetUsername(), true),
-		rs.WithStatus(userStatus),
+	}
+
+	switch user.GetOrgMembershipStatus() {
+	case userStatusActive:
+		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED))
+	case userStatusPending:
+		userTraits = append(userTraits, rs.WithDetailedStatus(v2.UserTrait_Status_STATUS_ENABLED, userStatusPending))
+	default:
+		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED))
 	}
 
 	resource, err := rs.NewUserResource(
