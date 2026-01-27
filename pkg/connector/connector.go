@@ -26,7 +26,7 @@ type MongoDB struct {
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+func (d *MongoDB) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncer {
 	builders := []connectorbuilder.ResourceSyncer{
 		newOrganizationBuilder(d.client),
 		newUserBuilder(d.client, d.createInviteKey),
@@ -49,7 +49,7 @@ func (d *MongoDB) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 
 // Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
 // It streams a response, always starting with a metadata object, following by chunked payloads for the asset.
-func (d *MongoDB) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.ReadCloser, error) {
+func (d *MongoDB) Asset(_ context.Context, _ *v2.AssetRef) (string, io.ReadCloser, error) {
 	return "", nil, nil
 }
 
@@ -109,7 +109,8 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 		"authType": {
 			DisplayName: "Authentication Type",
 			Required:    false,
-			Description: "The authentication method for the database user. Defaults to SCRAM-SHA (password-based). Options: SCRAM-SHA, AWS_IAM_USER, X509_CUSTOMER, X509_MANAGED, LDAP_USER, OIDC_WORKLOAD.",
+			Description: "The authentication method for the database user. Defaults to SCRAM-SHA (password-based). " +
+				"Options: SCRAM-SHA, AWS_IAM_USER, X509_CUSTOMER, X509_MANAGED, LDAP_USER, OIDC_WORKLOAD.",
 			Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
 				StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 			},
@@ -141,12 +142,15 @@ func (d *MongoDB) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
-func (d *MongoDB) Validate(ctx context.Context) (annotations.Annotations, error) {
+func (d *MongoDB) Validate(_ context.Context) (annotations.Annotations, error) {
 	return nil, nil
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool, mProxy *mongoconfig.MongoProxy) (*MongoDB, error) {
+func New(_ context.Context, publicKey, privateKey string,
+	createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool,
+	mProxy *mongoconfig.MongoProxy,
+) (*MongoDB, error) {
 	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
 	if err != nil {
 		return nil, err

@@ -83,7 +83,10 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, parentResourceID.Resource).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(
+		ctx,
+		parentResourceID.Resource,
+	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
 	}
@@ -145,7 +148,11 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		orgId = resource.GetParentResourceId().GetResource()
 	}
 
-	members, resp, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(ctx, orgId, teamId).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := o.client.MongoDBCloudUsersApi.ListTeamUsers(
+		ctx,
+		orgId,
+		teamId,
+	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to list team members: %w", parseToUHttpError(resp, err))
 	}

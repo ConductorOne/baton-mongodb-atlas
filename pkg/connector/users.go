@@ -115,8 +115,10 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 	switch user.GetOrgMembershipStatus() {
 	case userStatusActive:
 		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED))
+
 	case userStatusPending:
 		userTraits = append(userTraits, rs.WithDetailedStatus(v2.UserTrait_Status_STATUS_ENABLED, userStatusPending))
+
 	default:
 		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED))
 	}
@@ -147,7 +149,10 @@ func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, parentResourceID.GetResource()).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(
+		ctx,
+		parentResourceID.GetResource(),
+	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to list users: %w", parseToUHttpError(resp, err))
 	}
@@ -188,7 +193,8 @@ func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.LocalCredentialOptions) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
+func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.AccountInfo, credentialOptions *v2.LocalCredentialOptions,
+) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
 	var err error
@@ -242,9 +248,15 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 				if atlasErr, ok := admin.AsError(err); ok {
 					switch atlasErr.ErrorCode {
 					case "CANNOT_ADD_PENDING_USER":
-						return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' has a pending invite in the organization", email))
+						return nil, nil, nil, status.Error(
+							codes.FailedPrecondition,
+							fmt.Sprintf("the user '%s' has a pending invite in the organization", email),
+						)
 					case "NOT_USER_ADMIN":
-						return nil, nil, nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("the user '%s' is not in the organization either received an invite, enable createInviteKey to create the invite", email))
+						return nil, nil, nil, status.Error(
+							codes.FailedPrecondition,
+							fmt.Sprintf("the user '%s' is not in the organization either received an invite, enable createInviteKey to create the invite", email),
+						)
 					}
 				}
 
@@ -252,7 +264,11 @@ func (o *userBuilder) CreateAccount(ctx context.Context, accountInfo *v2.Account
 			}
 
 			if result.Results == nil {
-				return nil, nil, nil, uhttp.WrapErrors(codes.NotFound, "mongo-db-connector: user not found", fmt.Errorf("user '%s' not found, results is nil", email))
+				return nil, nil, nil, uhttp.WrapErrors(
+					codes.NotFound,
+					"mongo-db-connector: user not found",
+					fmt.Errorf("user '%s' not found, results is nil", email),
+				)
 			}
 
 			for _, userResponse := range *result.Results {

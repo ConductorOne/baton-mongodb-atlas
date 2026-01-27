@@ -205,7 +205,10 @@ func (p *projectBuilder) Grants(ctx context.Context, resource *v2.Resource, pTok
 }
 
 func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, resp, err := p.client.MongoDBCloudUsersApi.ListProjectUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := p.client.MongoDBCloudUsersApi.ListProjectUsers(
+		ctx,
+		resource.Id.Resource,
+	).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list project users: %w", parseToUHttpError(resp, err))
 	}
@@ -232,7 +235,10 @@ func (p *projectBuilder) GrantUsers(ctx context.Context, resource *v2.Resource, 
 }
 
 func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	members, resp, err := p.client.DatabaseUsersApi.ListDatabaseUsers(ctx, resource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	members, resp, err := p.client.DatabaseUsersApi.ListDatabaseUsers(
+		ctx,
+		resource.Id.Resource,
+	).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list project database users: %w", parseToUHttpError(resp, err))
 	}
@@ -332,7 +338,11 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, grant.Entitlement.Resource.Id.Resource, grant.Principal.Id.Resource).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(
+		ctx,
+		grant.Entitlement.Resource.Id.Resource,
+		grant.Principal.Id.Resource,
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err = fmt.Errorf("failed to remove user from project: %w", parseToUHttpError(resp, err))
 

@@ -73,7 +73,8 @@ func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		return nil, "", nil, err
 	}
 
-	organizations, resp, err := o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	organizations, resp, err :=
+		o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to list organizations: %w", parseToUHttpError(resp, err))
 	}
@@ -342,7 +343,10 @@ func (o *organizationBuilder) Revoke(ctx context.Context, grant *v2.Grant) (anno
 }
 
 func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	teams, resp, err :=
+		o.client.TeamsApi.ListOrganizationTeams(
+			ctx, orgResource.Id.Resource,
+		).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
 	}
@@ -413,7 +417,10 @@ func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2
 }
 
 func (o *organizationBuilder) GrantUsers(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(ctx, orgResource.Id.Resource).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	users, resp, err := o.client.MongoDBCloudUsersApi.ListOrganizationUsers(
+		ctx,
+		orgResource.Id.Resource,
+	).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list organization users: %w", parseToUHttpError(resp, err))
 	}
