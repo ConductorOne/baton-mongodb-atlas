@@ -376,7 +376,8 @@ func (o *organizationBuilder) GrantTeams(ctx context.Context, orgResource *v2.Re
 }
 
 func (o *organizationBuilder) GrantProjects(ctx context.Context, orgResource *v2.Resource, page int) ([]*v2.Grant, int, error) {
-	projects, resp, err := o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	projects, resp, err :=
+		o.client.ProjectsApi.ListProjects(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list projects: %w", parseToUHttpError(resp, err))
 	}
