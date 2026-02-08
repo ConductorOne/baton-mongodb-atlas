@@ -209,6 +209,10 @@ func New(ctx context.Context, config *cfg.Mongodbatlas, opts *cli.ConnectorOpts)
 		clientModifiers = append(clientModifiers, admin.UseDigestAuth(config.PublicKey, config.PrivateKey))
 	}
 
+	if config.BaseUrl != "" {
+		clientModifiers = append(clientModifiers, admin.UseBaseURL(config.BaseUrl))
+	}
+
 	client, err := admin.NewClient(clientModifiers...)
 	if err != nil {
 		return nil, nil, err

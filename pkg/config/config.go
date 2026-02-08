@@ -63,6 +63,11 @@ var MongoProxyPort = field.IntField(
 	field.WithExportTarget(field.ExportTargetOps),
 )
 
+var BaseURLField = field.StringField(
+	"base-url",
+	field.WithDescription("Override the MongoDB Atlas API URL (for testing)"),
+)
+
 //go:generate go run ./gen
 var Config = field.NewConfiguration(
 	[]field.SchemaField{
@@ -75,6 +80,8 @@ var Config = field.NewConfiguration(
 		// Proxy fields
 		MongoProxyHost,
 		MongoProxyPort,
+		// Testing
+		BaseURLField,
 	},
 	field.WithConnectorDisplayName("MongoDB Atlas"),
 	field.WithHelpUrl("/docs/baton/mongodb-atlas"),
