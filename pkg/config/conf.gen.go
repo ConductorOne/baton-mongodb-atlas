@@ -12,9 +12,10 @@ type Mongodbatlas struct {
 	DeleteDatabaseUserWithReadOnly bool `mapstructure:"delete-database-user-with-read-only"`
 	MongoProxyHost string `mapstructure:"mongo-proxy-host"`
 	MongoProxyPort int `mapstructure:"mongo-proxy-port"`
+	BaseUrl string `mapstructure:"base-url"`
 }
 
-func (c* Mongodbatlas) findFieldByTag(tagValue string) (any, bool) {
+func (c *Mongodbatlas) findFieldByTag(tagValue string) (any, bool) {
 	v := reflect.ValueOf(c).Elem() // Dereference pointer to struct
 	t := v.Type()
 
@@ -46,11 +47,13 @@ func (c *Mongodbatlas) GetString(fieldName string) string {
 	if !ok {
 		return ""
 	}
-	t, ok := v.(string)
-	if !ok {
-		panic("wrong type")
+	if t, ok := v.(string); ok {
+		return t
 	}
-	return t
+	if t, ok := v.([]byte); ok {
+		return string(t)
+	}
+	panic("wrong type")
 }
 
 func (c *Mongodbatlas) GetInt(fieldName string) int {
