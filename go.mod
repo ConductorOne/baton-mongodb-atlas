@@ -6,7 +6,7 @@ require (
 	github.com/conductorone/baton-sdk v0.7.16
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
-	github.com/quasilyte/go-ruleguard/dsl v0.3.22
+	github.com/quasilyte/go-ruleguard/dsl v0.3.23
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/atlas-sdk/v20250312006 v20250312006.0.0
 	go.mongodb.org/mongo-driver v1.17.4
