@@ -1,6 +1,6 @@
 ![Baton Logo](./docs/images/baton-logo.png)
 
-# `baton-mongodb-atlas` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-mongodb-atlas.svg)](https://pkg.go.dev/github.com/conductorone/baton-mongodb-atlas) ![main ci](https://github.com/conductorone/baton-mongodb-atlas/actions/workflows/main.yaml/badge.svg)
+# `baton-mongodb-atlas` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-mongodb-atlas.svg)](https://pkg.go.dev/github.com/conductorone/baton-mongodb-atlas) ![verify](https://github.com/conductorone/baton-mongodb-atlas/actions/workflows/verify.yaml/badge.svg)
 
 `baton-mongodb-atlas` is a connector for Baton built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It works with MongoDB Atlas API.
 
