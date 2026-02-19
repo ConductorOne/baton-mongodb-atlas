@@ -63,6 +63,7 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 		cc.EnableMongoDriver,
 		cc.DeleteDatabaseUserWithReadOnly,
 		mProxy,
+		cc.BaseUrl,
 	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
