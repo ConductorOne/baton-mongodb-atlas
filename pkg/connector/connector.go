@@ -163,8 +163,13 @@ var _ io.Closer = (*MongoDB)(nil)
 func New(_ context.Context, publicKey, privateKey string,
 	createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool,
 	mProxy *mongoconfig.MongoProxy,
+	baseURL string,
 ) (*MongoDB, error) {
-	client, err := admin.NewClient(admin.UseDigestAuth(publicKey, privateKey))
+	opts := []admin.ClientModifier{admin.UseDigestAuth(publicKey, privateKey)}
+	if baseURL != "" {
+		opts = append(opts, admin.UseBaseURL(baseURL))
+	}
+	client, err := admin.NewClient(opts...)
 	if err != nil {
 		return nil, err
 	}
