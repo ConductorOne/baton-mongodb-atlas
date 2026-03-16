@@ -20,7 +20,7 @@ func (p *MongoProxy) Enabled() bool {
 }
 
 func (p *MongoProxy) Address() string {
-	return fmt.Sprintf("%s:%d", p.Host, p.Port)
+	return net.JoinHostPort(p.Host, fmt.Sprint(p.Port))
 }
 
 // Dialer returns a SOCKS5 proxy dialer that routes all connections including
@@ -69,24 +69,6 @@ func (p *MongoProxy) HTTPTransport() (*http.Transport, error) {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}, nil
-}
-
-// HTTPClient returns an http.Client configured to use the SOCKS5 proxy.
-// If the proxy is not enabled, returns http.DefaultClient.
-func (p *MongoProxy) HTTPClient() (*http.Client, error) {
-	transport, err := p.HTTPTransport()
-	if err != nil {
-		return nil, err
-	}
-
-	if transport == nil {
-		return http.DefaultClient, nil
-	}
-
-	return &http.Client{
-		Transport: transport,
-		Timeout:   30 * time.Second,
 	}, nil
 }
 

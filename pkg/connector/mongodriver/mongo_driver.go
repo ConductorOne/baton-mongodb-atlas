@@ -238,6 +238,15 @@ func (m *MongoDriver) connectionString(ctx context.Context, groupID, clusterName
 		return nil, fmt.Errorf("failed to get cluster: %w", err)
 	}
 
+	if clusterInfo.ConnectionStrings == nil {
+		l.Error(
+			"Cluster connection strings not available",
+			zap.String("cluster_name", clusterName),
+			zap.String("group_id", groupID),
+		)
+		return nil, fmt.Errorf("cluster %s in group %s does not have connection strings yet", clusterName, groupID)
+	}
+
 	// Prefer Standard (mongodb://) connection string as it doesn't require DNS SRV lookups.
 	// This is important when using a SOCKS5 proxy since SRV lookups may not go through the proxy.
 	if clusterInfo.ConnectionStrings.Standard != nil && *clusterInfo.ConnectionStrings.Standard != "" {
