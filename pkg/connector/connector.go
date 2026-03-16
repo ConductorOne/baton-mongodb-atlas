@@ -165,7 +165,11 @@ func (d *MongoDB) Close() error {
 var _ io.Closer = (*MongoDB)(nil)
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, publicKey, privateKey string, createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool, mProxy *mongoconfig.MongoProxy) (*MongoDB, error) {
+func New(
+	ctx context.Context, publicKey, privateKey string,
+	createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool,
+	mProxy *mongoconfig.MongoProxy,
+) (*MongoDB, error) {
 	l := ctxzap.Extract(ctx)
 	clientModifiers := []admin.ClientModifier{}
 
