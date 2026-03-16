@@ -26,7 +26,7 @@ func TestDatabaseUserBuilderList(t *testing.T) {
 		ResourceType: "project",
 		Resource:     "654be90ed21dc34308aba9bb",
 	}
-	pToken := &pagination.Token{
+	pToken := &pagination.Token{ //nolint:gosec // Not a credential, this is a pagination token.
 		Size:  0,
 		Token: `{"states":null,"current_state":{"token":"1","resource_type_id":"database_user","resource_id":""}}`,
 	}
