@@ -54,14 +54,14 @@ var MongoProxyHost = field.StringField(
 	"mongo-proxy-host",
 	field.WithDisplayName("Mongo Proxy Host"),
 	field.WithDescription("The host of the MongoDB proxy server."),
-	// field.WithExportTarget(field.ExportTargetOps), // TODO(lauren) add this back
+	field.WithExportTarget(field.ExportTargetOps),
 )
 
 var MongoProxyPort = field.IntField(
 	"mongo-proxy-port",
 	field.WithDisplayName("Mongo Proxy Port"),
 	field.WithDescription("The port of the MongoDB proxy server."),
-	// field.WithExportTarget(field.ExportTargetOps), // TODO(lauren) add this back
+	field.WithExportTarget(field.ExportTargetOps),
 )
 
 //go:generate go run ./gen

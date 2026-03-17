@@ -54,6 +54,10 @@ func getConnector(ctx context.Context, cc *cfg.Mongodbatlas) (types.ConnectorSer
 		Port: cc.MongoProxyPort,
 	}
 
+	if mProxy.Port == 0 && mProxy.Host != "" {
+		mProxy.Port = 1080
+	}
+
 	cb, err := connector.New(
 		ctx,
 		cc.PublicKey,
