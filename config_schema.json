@@ -145,12 +145,14 @@
       "name": "mongo-proxy-host",
       "displayName": "Mongo Proxy Host",
       "description": "The host of the MongoDB proxy server.",
+      "isOps": true,
       "stringField": {}
     },
     {
       "name": "mongo-proxy-port",
       "displayName": "Mongo Proxy Port",
       "description": "The port of the MongoDB proxy server.",
+      "isOps": true,
       "intField": {}
     }
   ],
