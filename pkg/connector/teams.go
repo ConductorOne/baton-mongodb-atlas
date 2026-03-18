@@ -7,7 +7,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -73,14 +72,14 @@ func newTeamBuilder(client *admin.APIClient) *teamBuilder {
 	}
 }
 
-func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	if parentResourceID == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	teams, resp, err := o.client.TeamsApi.ListOrganizationTeams(
@@ -88,37 +87,37 @@ func (o *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		parentResourceID.Resource,
 	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to list organization teams: %w", parseToUHttpError(resp, err))
 	}
 
 	if teams == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	var resources []*v2.Resource
 	for _, team := range *teams.Results {
 		resource, err := newTeamResource(ctx, parentResourceID, team)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create team resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create team resource: %w", err)
 		}
 
 		resources = append(resources, resource)
 	}
 
 	if isLastPage(len(*teams.Results), resourcePageSize) {
-		return resources, "", nil, nil
+		return resources, nil, nil
 	}
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return resources, nextPage, nil, nil
+	return resources, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 // Entitlements always returns an empty slice for users.
-func (o *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (o *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	var rv []*v2.Entitlement
 
 	assigmentOptions := []ent.EntitlementOption{
@@ -130,14 +129,14 @@ func (o *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 	entitlement := ent.NewAssignmentEntitlement(resource, memberEntitlement, assigmentOptions...)
 	rv = append(rv, entitlement)
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
+func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	l := ctxzap.Extract(ctx)
@@ -154,33 +153,33 @@ func (o *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		teamId,
 	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list team members: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to list team members: %w", parseToUHttpError(resp, err))
 	}
 
 	if members == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	var rv []*v2.Grant
 	for _, member := range *members.Results {
 		userResource, err := newUserResource(ctx, resource.ParentResourceId, &member)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create user resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create user resource: %w", err)
 		}
 
 		rv = append(rv, grant.NewGrant(resource, memberEntitlement, userResource.Id))
 	}
 
 	if isLastPage(len(*members.Results), resourcePageSize) {
-		return rv, "", nil, nil
+		return rv, nil, nil
 	}
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return nil, nextPage, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {

@@ -6,8 +6,6 @@ import (
 	"strconv"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
@@ -30,21 +28,21 @@ func newMongoClusterBuilder(client *admin.APIClient, enableSyncDatabases bool) *
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	if parentResourceID == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	if parentResourceID.ResourceType != projectResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType)
+		return nil, nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", projectResourceType.Id, parentResourceID.ResourceType)
 	}
 
 	currentPage := 1
 
-	if pToken != nil && pToken.Token != "" {
-		tempPage, err := strconv.Atoi(pToken.Token)
+	if opts.PageToken.Token != "" {
+		tempPage, err := strconv.Atoi(opts.PageToken.Token)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("invalid pagination token: %w", err)
+			return nil, nil, fmt.Errorf("invalid pagination token: %w", err)
 		}
 
 		currentPage = tempPage
@@ -55,7 +53,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		IncludeDeletedWithRetainedBackups(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list clusters: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to list clusters: %w", parseToUHttpError(resp, err))
 	}
 
 	resources := make([]*v2.Resource, 0, len(response.GetResults()))
@@ -63,7 +61,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 	for _, cluster := range response.GetResults() {
 		resource, err := newMongoClusterResource(cluster, parentResourceID, o.enableSyncDatabases)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -74,7 +72,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 		nextPage = strconv.Itoa(currentPage + 1)
 	}
 
-	return resources, nextPage, nil, nil
+	return resources, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 func newMongoClusterResource(
@@ -125,11 +123,11 @@ func newMongoClusterResource(
 }
 
 // Entitlements always returns an empty slice for users.
-func (o *mongoClusterBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *mongoClusterBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *mongoClusterBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *mongoClusterBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }

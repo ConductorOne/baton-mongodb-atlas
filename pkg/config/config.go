@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-
 	"github.com/conductorone/baton-sdk/pkg/field"
 )
 
@@ -24,6 +22,7 @@ var CreateInviteKeyField = field.BoolField(
 	field.WithDisplayName("Create Invite"),
 	field.WithDescription("If enabled, Baton will create invites for users that do not have an account in MongoDB Atlas when provisioning."),
 	field.WithRequired(false),
+	field.WithDefaultValue(true),
 )
 
 var EnableSyncDatabases = field.BoolField(
@@ -77,7 +76,7 @@ var Config = field.NewConfiguration(
 		MongoProxyHost,
 		MongoProxyPort,
 	},
-	field.WithConnectorDisplayName("MongodbAtlas"),
+	field.WithConnectorDisplayName("MongoDB Atlas"),
 	field.WithHelpUrl("/docs/baton/mongodb-atlas"),
 	field.WithIconUrl("/static/app-icons/mongodb.svg"),
 	field.WithConstraints(
@@ -91,19 +90,3 @@ var Config = field.NewConfiguration(
 		),
 	),
 )
-
-// ValidateConfig is run after the configuration is loaded, and should return an
-// error if it isn't valid. Implementing this function is optional, it only
-// needs to perform extra validations that cannot be encoded with configuration
-// parameters.
-func ValidateConfig(cfg *Mongodbatlas) error {
-	if cfg.PublicKey == "" {
-		return fmt.Errorf("config: missing public key")
-	}
-
-	if cfg.PrivateKey == "" {
-		return fmt.Errorf("config: missing private key")
-	}
-
-	return nil
-}

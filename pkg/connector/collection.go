@@ -11,8 +11,6 @@ import (
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
@@ -35,20 +33,20 @@ func newCollectionBuilder(client *admin.APIClient, mongodriver *mongodriver.Mong
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	l := ctxzap.Extract(ctx)
 
 	if parentResourceID == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	if parentResourceID.ResourceType != databaseResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", databaseResourceType.Id, parentResourceID.ResourceType)
+		return nil, nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", databaseResourceType.Id, parentResourceID.ResourceType)
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: resource ID %s does not have expected format", parentResourceID.Resource)
+		return nil, nil, fmt.Errorf("invalid parent resource ID: resource ID %s does not have expected format", parentResourceID.Resource)
 	}
 
 	groupID := splited[0]
@@ -58,7 +56,7 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	_, client, err := o.mongodriver.Connect(ctx, groupID, clusterName)
 	if err != nil {
 		l.Error("failed to connect to MongoDB Atlas cluster", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
-		return nil, "", nil, fmt.Errorf("failed to connect to MongoDB Atlas cluster: %w", err)
+		return nil, nil, fmt.Errorf("failed to connect to MongoDB Atlas cluster: %w", err)
 	}
 
 	db := client.Database(dbName, nil)
@@ -68,10 +66,10 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 		if strings.Contains(err.Error(), "(Unauthorized) not authorized") {
 			l.Info("unauthorized to list collections skipping", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.String("db_name", dbName))
 
-			return nil, "", nil, nil
+			return nil, nil, nil
 		}
 
-		return nil, "", nil, fmt.Errorf("failed to list collection names: %w", err)
+		return nil, nil, fmt.Errorf("failed to list collection names: %w", err)
 	}
 
 	resources := make([]*v2.Resource, 0)
@@ -79,13 +77,13 @@ func (o *collectionBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 	for _, collectionName := range collections {
 		resource, err := newCollectionResource(groupID, clusterName, dbName, collectionName, parentResourceID)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		resources = append(resources, resource)
 	}
 
-	return resources, "", nil, nil
+	return resources, nil, nil
 }
 
 func newCollectionResource(
@@ -112,11 +110,11 @@ func newCollectionResource(
 }
 
 // Entitlements always returns an empty slice for users.
-func (o *collectionBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *collectionBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *collectionBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *collectionBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
