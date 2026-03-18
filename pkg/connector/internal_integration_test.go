@@ -7,6 +7,7 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
@@ -26,7 +27,7 @@ func TestDatabaseUserBuilderList(t *testing.T) {
 		ResourceType: "project",
 		Resource:     "654be90ed21dc34308aba9bb",
 	}
-	pToken := &pagination.Token{ //nolint:gosec // Not a credential, this is a pagination token.
+	pToken := pagination.Token{ //nolint:gosec // Not a credential, this is a pagination token.
 		Size:  0,
 		Token: `{"states":null,"current_state":{"token":"1","resource_type_id":"database_user","resource_id":""}}`,
 	}
@@ -37,9 +38,7 @@ func TestDatabaseUserBuilderList(t *testing.T) {
 		resourceType: databaseUserResourceType,
 		client:       cli,
 	}
-	for pToken.Token != "" {
-		_, token, _, err := user.List(ctx, parentResourceID, pToken)
-		assert.Nil(t, err)
-		pToken.Token = token
-	}
+	_, syncResp, err := user.List(ctx, parentResourceID, resource.SyncOpAttrs{PageToken: pToken})
+	assert.Nil(t, err)
+	pToken.Token = syncResp.NextPageToken
 }
