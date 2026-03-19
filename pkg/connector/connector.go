@@ -166,6 +166,7 @@ func (d *MongoDB) Close() error {
 // Ensure MongoDB implements io.Closer at compile time.
 var _ io.Closer = (*MongoDB)(nil)
 
+// New returns a new instance of the connector.
 func New(ctx context.Context, config *cfg.Mongodbatlas, opts *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
 	l := ctxzap.Extract(ctx)
 	clientModifiers := []admin.ClientModifier{}
@@ -222,58 +223,4 @@ func New(ctx context.Context, config *cfg.Mongodbatlas, opts *cli.ConnectorOpts)
 		deleteDatabaseUserWithReadOnly: config.DeleteDatabaseUserWithReadOnly,
 		mProxy:                         mProxy,
 	}, nil, nil
-}
-
-// New returns a new instance of the connector.
-func New2(
-	ctx context.Context, publicKey, privateKey string,
-	createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool,
-	mProxy *mongoconfig.MongoProxy,
-) (*MongoDB, error) {
-	l := ctxzap.Extract(ctx)
-	clientModifiers := []admin.ClientModifier{}
-
-	// If proxy is enabled, create an HTTP client that routes through SOCKS5
-	if mProxy != nil && mProxy.Enabled() {
-		l.Info(
-			"Configuring SOCKS5 proxy for Atlas API",
-			zap.String("proxy_address", mProxy.Address()),
-		)
-
-		httpTransport, err := mProxy.HTTPTransport()
-		if err != nil {
-			l.Error("Failed to create SOCKS5 HTTP transport", zap.Error(err))
-			return nil, fmt.Errorf("failed to create SOCKS5 HTTP transport: %w", err)
-		}
-
-		// Wrap the SOCKS5 transport with digest auth
-		digestTransport := digest.NewTransportWithHTTPRoundTripper(publicKey, privateKey, httpTransport)
-		httpClient, err := digestTransport.Client()
-		if err != nil {
-			l.Error("Failed to create digest HTTP client", zap.Error(err))
-			return nil, fmt.Errorf("failed to create digest HTTP client: %w", err)
-		}
-
-		clientModifiers = append(clientModifiers, admin.UseHTTPClient(httpClient))
-		l.Info("Atlas API client configured to use SOCKS5 proxy")
-	} else {
-		l.Debug("No proxy configured, using direct connection for Atlas API")
-		// No proxy, use standard digest auth
-		clientModifiers = append(clientModifiers, admin.UseDigestAuth(publicKey, privateKey))
-	}
-
-	client, err := admin.NewClient(clientModifiers...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &MongoDB{
-		client:                         client,
-		createInviteKey:                createInviteKey,
-		mongodriver:                    mongodriver.NewMongoDriver(client, time.Minute*30, mProxy),
-		enableSyncDatabases:            enableSyncDatabases,
-		enableMongoDriver:              enableMongoDriver,
-		deleteDatabaseUserWithReadOnly: deleteDatabaseUserWithReadOnly,
-		mProxy:                         mProxy,
-	}, nil
 }
