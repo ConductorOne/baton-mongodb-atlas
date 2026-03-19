@@ -180,7 +180,7 @@ func New(ctx context.Context, config *cfg.Mongodbatlas, opts *cli.ConnectorOpts)
 	}
 
 	// If proxy is enabled, create an HTTP client that routes through SOCKS5
-	if config != nil && mProxy.Enabled() {
+	if mProxy.Enabled() {
 		l.Info(
 			"Configuring SOCKS5 proxy for Atlas API",
 			zap.String("proxy_address", mProxy.Address()),

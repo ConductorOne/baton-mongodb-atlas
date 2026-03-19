@@ -17,7 +17,7 @@ var connectorName = "baton-mongodb-atlas"
 func main() {
 	ctx := context.Background()
 	configschema.RunConnector(ctx,
-		"connectorName",
+		connectorName,
 		version,
 		cfg.Config,
 		connector.New,
