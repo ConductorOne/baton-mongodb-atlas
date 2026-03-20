@@ -119,7 +119,9 @@
       "name": "create-invite-key",
       "displayName": "Create Invite",
       "description": "If enabled, Baton will create invites for users that do not have an account in MongoDB Atlas when provisioning.",
-      "boolField": {}
+      "boolField": {
+        "defaultValue": true
+      }
     },
     {
       "name": "enable-sync-databases",
@@ -167,7 +169,7 @@
       ]
     }
   ],
-  "displayName": "MongodbAtlas",
+  "displayName": "MongoDB Atlas",
   "helpUrl": "/docs/baton/mongodb-atlas",
   "iconUrl": "/static/app-icons/mongodb.svg"
 }
