@@ -9,7 +9,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -67,45 +66,45 @@ func newOrganizationResource(organization admin.AtlasOrganization) (*v2.Resource
 	return resource, nil
 }
 
-func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
+func (o *organizationBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	organizations, resp, err :=
 		o.client.OrganizationsApi.ListOrganizations(ctx).PageNum(page).ItemsPerPage(resourcePageSize).IncludeCount(true).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list organizations: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to list organizations: %w", parseToUHttpError(resp, err))
 	}
 
 	if organizations.Results == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	var resources []*v2.Resource
 	for _, organization := range *organizations.Results {
 		resource, err := newOrganizationResource(organization)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create organization resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create organization resource: %w", err)
 		}
 
 		resources = append(resources, resource)
 	}
 
 	if isLastPage(len(*organizations.Results), resourcePageSize) {
-		return resources, "", nil, nil
+		return resources, nil, nil
 	}
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return resources, nextPage, nil, nil
+	return resources, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
-func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	var rv []*v2.Entitlement
 
 	for _, e := range organizationUserEntitlements {
@@ -145,19 +144,19 @@ func (o *organizationBuilder) Entitlements(_ context.Context, resource *v2.Resou
 	ent = entitlement.NewAssignmentEntitlement(resource, partEntitlement, assigmentOptions...)
 	rv = append(rv, ent)
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
 	bag, page, err := parsePageToken(
-		pToken.Token,
+		opts.PageToken.Token,
 		&v2.ResourceId{ResourceType: teamResourceType.Id},
 		&v2.ResourceId{ResourceType: projectResourceType.Id},
 		&v2.ResourceId{ResourceType: userResourceType.Id},
 	)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	var rv []*v2.Grant
@@ -166,7 +165,7 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	case teamResourceType.Id:
 		grants, c, err := o.GrantTeams(ctx, resource, page)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		count = c
 		rv = append(rv, grants...)
@@ -174,14 +173,14 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	case projectResourceType.Id:
 		grants, c, err := o.GrantProjects(ctx, resource, page)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		count = c
 		rv = append(rv, grants...)
 	case userResourceType.Id:
 		grants, c, err := o.GrantUsers(ctx, resource, page)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		count = c
 		rv = append(rv, grants...)
@@ -190,19 +189,19 @@ func (o *organizationBuilder) Grants(ctx context.Context, resource *v2.Resource,
 	if isLastPage(count, resourcePageSize) {
 		nextPage, err := bag.NextToken("")
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 
 		// Process the next resource type.
-		return rv, nextPage, nil, nil
+		return rv, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 	}
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return rv, nextPage, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 func (o *organizationBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {

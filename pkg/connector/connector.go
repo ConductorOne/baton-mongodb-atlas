@@ -6,7 +6,9 @@ import (
 	"io"
 	"time"
 
+	cfg "github.com/conductorone/baton-mongodb-atlas/pkg/config"
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
+	"github.com/conductorone/baton-sdk/pkg/cli"
 
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongodriver"
 
@@ -31,8 +33,8 @@ type MongoDB struct {
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *MongoDB) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncer {
-	builders := []connectorbuilder.ResourceSyncer{
+func (d *MongoDB) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncerV2 {
+	builders := []connectorbuilder.ResourceSyncerV2{
 		newOrganizationBuilder(d.client),
 		newUserBuilder(d.client, d.createInviteKey),
 		newTeamBuilder(d.client),
@@ -165,16 +167,21 @@ func (d *MongoDB) Close() error {
 var _ io.Closer = (*MongoDB)(nil)
 
 // New returns a new instance of the connector.
-func New(
-	ctx context.Context, publicKey, privateKey string,
-	createInviteKey, enableSyncDatabases, enableMongoDriver, deleteDatabaseUserWithReadOnly bool,
-	mProxy *mongoconfig.MongoProxy,
-) (*MongoDB, error) {
+func New(ctx context.Context, config *cfg.Mongodbatlas, opts *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
 	l := ctxzap.Extract(ctx)
 	clientModifiers := []admin.ClientModifier{}
 
+	mProxy := &mongoconfig.MongoProxy{
+		Host: config.MongoProxyHost,
+		Port: config.MongoProxyPort,
+	}
+
+	if mProxy.Port == 0 && mProxy.Host != "" {
+		mProxy.Port = 1080
+	}
+
 	// If proxy is enabled, create an HTTP client that routes through SOCKS5
-	if mProxy != nil && mProxy.Enabled() {
+	if mProxy.Enabled() {
 		l.Info(
 			"Configuring SOCKS5 proxy for Atlas API",
 			zap.String("proxy_address", mProxy.Address()),
@@ -183,15 +190,15 @@ func New(
 		httpTransport, err := mProxy.HTTPTransport()
 		if err != nil {
 			l.Error("Failed to create SOCKS5 HTTP transport", zap.Error(err))
-			return nil, fmt.Errorf("failed to create SOCKS5 HTTP transport: %w", err)
+			return nil, nil, fmt.Errorf("failed to create SOCKS5 HTTP transport: %w", err)
 		}
 
 		// Wrap the SOCKS5 transport with digest auth
-		digestTransport := digest.NewTransportWithHTTPRoundTripper(publicKey, privateKey, httpTransport)
+		digestTransport := digest.NewTransportWithHTTPRoundTripper(config.PublicKey, config.PrivateKey, httpTransport)
 		httpClient, err := digestTransport.Client()
 		if err != nil {
 			l.Error("Failed to create digest HTTP client", zap.Error(err))
-			return nil, fmt.Errorf("failed to create digest HTTP client: %w", err)
+			return nil, nil, fmt.Errorf("failed to create digest HTTP client: %w", err)
 		}
 
 		clientModifiers = append(clientModifiers, admin.UseHTTPClient(httpClient))
@@ -199,21 +206,21 @@ func New(
 	} else {
 		l.Debug("No proxy configured, using direct connection for Atlas API")
 		// No proxy, use standard digest auth
-		clientModifiers = append(clientModifiers, admin.UseDigestAuth(publicKey, privateKey))
+		clientModifiers = append(clientModifiers, admin.UseDigestAuth(config.PublicKey, config.PrivateKey))
 	}
 
 	client, err := admin.NewClient(clientModifiers...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &MongoDB{
 		client:                         client,
-		createInviteKey:                createInviteKey,
+		createInviteKey:                config.CreateInviteKey,
 		mongodriver:                    mongodriver.NewMongoDriver(client, time.Minute*30, mProxy),
-		enableSyncDatabases:            enableSyncDatabases,
-		enableMongoDriver:              enableMongoDriver,
-		deleteDatabaseUserWithReadOnly: deleteDatabaseUserWithReadOnly,
+		enableSyncDatabases:            config.EnableSyncDatabases,
+		enableMongoDriver:              config.EnableMongoDriver,
+		deleteDatabaseUserWithReadOnly: config.DeleteDatabaseUserWithReadOnly,
 		mProxy:                         mProxy,
-	}, nil
+	}, nil, nil
 }

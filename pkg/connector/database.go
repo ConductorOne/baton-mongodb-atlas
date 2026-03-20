@@ -17,7 +17,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
@@ -58,25 +57,25 @@ func newDatabaseBuilder(
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	l := ctxzap.Extract(ctx)
 
 	if parentResourceID == nil {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	if parentResourceID.ResourceType != mongoClusterResourceType.Id {
-		return nil, "", nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", mongoClusterResourceType.Id, parentResourceID.ResourceType)
+		return nil, nil, fmt.Errorf("invalid parent resource type: expected %s, got %s", mongoClusterResourceType.Id, parentResourceID.ResourceType)
 	}
 
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to parse page token: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse page token: %w", err)
 	}
 
 	splited := strings.Split(parentResourceID.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid parent resource ID: resource ID %s does not have expected format", parentResourceID.Resource)
+		return nil, nil, fmt.Errorf("invalid parent resource ID: resource ID %s does not have expected format", parentResourceID.Resource)
 	}
 
 	groupID := splited[0]
@@ -86,18 +85,18 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	clusterInfo, resp, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to get cluster: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to get cluster: %w", parseToUHttpError(resp, err))
 	}
 
 	connectionsStrings := clusterInfo.GetConnectionStrings()
 	if connectionsStrings.Standard == nil {
 		l.Warn("Cluster does not have a standard connection string", zap.Any("clusterInfo", clusterInfo))
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	connectionString := strings.Split(*connectionsStrings.Standard, ",")
 	if len(connectionString) == 0 {
-		return nil, "", nil, fmt.Errorf("cluster does not have a valid connection string: cluster %s", clusterName)
+		return nil, nil, fmt.Errorf("cluster does not have a valid connection string: cluster %s", clusterName)
 	}
 	process := strings.TrimPrefix(connectionString[0], "mongodb://")
 
@@ -109,7 +108,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		if err != nil {
 			l.Error("failed to connect to MongoDB Atlas cluster skipping database sync", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
 			// We are skipping databases if we can't connect to the cluster.
-			return nil, "", nil, nil
+			return nil, nil, nil
 		}
 
 		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{}, &options.ListDatabasesOptions{
@@ -117,7 +116,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			NameOnly:            boolPointer(true),
 		})
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to list database names: %w", err)
+			return nil, nil, fmt.Errorf("failed to list database names: %w", err)
 		}
 
 		databases = names
@@ -129,11 +128,11 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			ItemsPerPage(resourcePageSize).
 			Execute() //nolint:bodyclose // The SDK handles closing the response body
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to list databases: %w", parseToUHttpError(resp, err))
+			return nil, nil, fmt.Errorf("failed to list databases: %w", parseToUHttpError(resp, err))
 		}
 
 		if execute.Results == nil || len(execute.GetResults()) == 0 {
-			return nil, "", nil, nil
+			return nil, nil, nil
 		}
 
 		for _, database := range execute.GetResults() {
@@ -151,7 +150,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 		resource, err := newDatabaseResource(groupID, clusterName, database, parentResourceID, o.enableMongoDriver)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to create resource: %w", err)
+			return nil, nil, fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		resources = append(resources, resource)
@@ -161,11 +160,11 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	if !o.enableMongoDriver {
 		nextPage, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to generate page token: %w", err)
+			return nil, nil, fmt.Errorf("failed to generate page token: %w", err)
 		}
 	}
 
-	return resources, nextPage, nil, nil
+	return resources, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 func newDatabaseResource(groupID string, clusterName string, dbName string, parentId *v2.ResourceId, enableMongoDriver bool) (*v2.Resource, error) {
@@ -204,7 +203,7 @@ func newDatabaseResource(groupID string, clusterName string, dbName string, pare
 }
 
 // Entitlements always returns an empty slice for users.
-func (o *databaseBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (o *databaseBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	ents := make([]*v2.Entitlement, 0)
 
 	for _, role := range dbRoles {
@@ -217,32 +216,32 @@ func (o *databaseBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 		ents = append(ents, ent)
 	}
 
-	return ents, "", nil, nil
+	return ents, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
 	splited := strings.Split(resource.Id.Resource, "/")
 	if len(splited) != 3 {
-		return nil, "", nil, fmt.Errorf("invalid resource ID: resource ID %s does not have expected format", resource.Id.Resource)
+		return nil, nil, fmt.Errorf("invalid resource ID: resource ID %s does not have expected format", resource.Id.Resource)
 	}
 
 	groupID := splited[0]
 
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: databaseResourceType.Id})
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to parse page token: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse page token: %w", err)
 	}
 
 	dbUsers, resp, err := o.client.DatabaseUsersApi.ListDatabaseUsers(ctx, groupID).
 		IncludeCount(true).PageNum(page).ItemsPerPage(resourcePageSize).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list database users: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("failed to list database users: %w", parseToUHttpError(resp, err))
 	}
 
 	if len(dbUsers.GetResults()) == 0 {
-		return nil, "", nil, nil
+		return nil, nil, nil
 	}
 
 	var grants []*v2.Grant
@@ -268,10 +267,10 @@ func (o *databaseBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 	nextPage, err := getPageTokenFromPage(bag, page+1)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to generate page token: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate page token: %w", err)
 	}
 
-	return grants, nextPage, nil, nil
+	return grants, &rs.SyncOpResults{NextPageToken: nextPage}, nil
 }
 
 func (o *databaseBuilder) Grant(ctx context.Context, resource *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
