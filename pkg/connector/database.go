@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -85,7 +86,7 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	clusterInfo, resp, err := o.client.ClustersApi.GetCluster(ctx, groupID, clusterName).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		if resp != nil && resp.StatusCode == 404 {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			l.Warn("Cluster not found, skipping database sync", zap.String("group_id", groupID), zap.String("cluster_name", clusterName))
 			return nil, nil, nil
 		}
