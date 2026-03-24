@@ -50,7 +50,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 
 	response, resp, err := o.client.ClustersApi.ListClusters(ctx, parentResourceID.GetResource()).
 		PageNum(currentPage).
-		IncludeDeletedWithRetainedBackups(true).
+		IncludeDeletedWithRetainedBackups(false).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list clusters: %w", parseToUHttpError(resp, err))
