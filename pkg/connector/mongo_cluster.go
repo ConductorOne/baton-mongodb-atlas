@@ -10,6 +10,11 @@ import (
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
+const (
+	clusterStateDeleting = "DELETING"
+	clusterStateDeleted  = "DELETED"
+)
+
 type mongoClusterBuilder struct {
 	client              *admin.APIClient
 	enableSyncDatabases bool
@@ -50,7 +55,7 @@ func (o *mongoClusterBuilder) List(ctx context.Context, parentResourceID *v2.Res
 
 	response, resp, err := o.client.ClustersApi.ListClusters(ctx, parentResourceID.GetResource()).
 		PageNum(currentPage).
-		IncludeDeletedWithRetainedBackups(false).
+		IncludeDeletedWithRetainedBackups(true).
 		Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list clusters: %w", parseToUHttpError(resp, err))
@@ -81,10 +86,11 @@ func newMongoClusterResource(
 	enableSyncDatabases bool,
 ) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"cluster_id":   cluster.GetId(),
-		"cluster_name": cluster.GetName(),
-		"cluster_type": cluster.GetClusterType(),
-		"group_id":     cluster.GetGroupId(),
+		"cluster_id":    cluster.GetId(),
+		"cluster_name":  cluster.GetName(),
+		"cluster_type":  cluster.GetClusterType(),
+		"group_id":      cluster.GetGroupId(),
+		"cluster_state": cluster.GetStateName(),
 	}
 
 	appTraits := []rs.AppTraitOption{
@@ -102,7 +108,11 @@ func newMongoClusterResource(
 		rs.WithParentResourceID(parentId),
 	}
 
-	if enableSyncDatabases {
+	state := cluster.GetStateName()
+	// Cluster is available if it is not deleting or deleted. If the cluster is in any of these states
+	// we omit the database sync as the cluster cannot be reached.
+	clusterAvailable := state != clusterStateDeleting && state != clusterStateDeleted
+	if enableSyncDatabases && clusterAvailable {
 		opts = append(opts, rs.WithAnnotation(&v2.ChildResourceType{
 			ResourceTypeId: databaseResourceType.Id,
 		}))
