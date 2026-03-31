@@ -3,9 +3,10 @@ module github.com/conductorone/baton-mongodb-atlas
 go 1.25.2
 
 require (
-	github.com/conductorone/baton-sdk v0.8.14
+	github.com/conductorone/baton-sdk v0.8.15
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/mongodb-forks/digest v1.1.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/atlas-sdk/v20250312006 v20250312006.0.0
@@ -71,7 +72,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/maypok86/otter/v2 v2.2.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/mongodb-forks/digest v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
