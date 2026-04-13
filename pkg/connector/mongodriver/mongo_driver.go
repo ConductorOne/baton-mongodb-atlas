@@ -11,6 +11,8 @@ import (
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/crypto"
@@ -126,15 +128,15 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 			pass: password,
 		}
 		m.accountsPerGroupId[groupID] = accountTuple
+		// Give Atlas a moment to propagate the newly-created user before first use.
+		// Only needed after creation; cache hits above skip this.
+		time.Sleep(time.Second * 5)
 	}
 
 	clientKey := fmt.Sprintf("%s-%s", groupID, clusterName)
-	client, ok := m.clients[clientKey]
-	if ok {
+	if client, ok := m.clients[clientKey]; ok {
 		return accountTuple.user, client, nil
 	}
-
-	time.Sleep(time.Second * 5) // Wait for the user to be fully created and available
 
 	connStr, err := m.connectionString(ctx, groupID, clusterName)
 	if err != nil {
@@ -160,68 +162,59 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		)
 	}
 
-	for i := 0; i < 10; i++ {
-		l.Info(
-			"Trying to connect to MongoDB",
-			zap.Int("attempt", i+1),
-			zap.String("cluster_name", clusterName),
-			zap.String("scheme", connStr.scheme),
-		)
+	l.Info(
+		"Connecting to MongoDB",
+		zap.String("cluster_name", clusterName),
+		zap.String("scheme", connStr.scheme),
+	)
 
-		opts := options.Client().
-			ApplyURI(uri).
-			SetMaxConnIdleTime(60 * time.Second).
-			SetMaxPoolSize(10)
+	opts := options.Client().
+		ApplyURI(uri).
+		SetMaxConnIdleTime(60 * time.Second).
+		SetMaxPoolSize(10)
 
-		if dialer != nil {
-			opts.SetDialer(dialer)
-			// Increase timeouts when using SOCKS5 proxy since connections take longer:
-			// proxy connect -> SOCKS5 handshake -> proxy connects to MongoDB -> TLS handshake
-			opts.SetConnectTimeout(60 * time.Second)
-			opts.SetServerSelectionTimeout(60 * time.Second)
-		}
-
-		client, err := mongo.Connect(ctx, opts)
-		if err != nil {
-			l.Error(
-				"Failed to connect to MongoDB",
-				zap.Error(err),
-				zap.Int("attempt", i+1),
-				zap.String("cluster_name", clusterName),
-			)
-			time.Sleep(time.Second * 2) // Retry after a delay
-			continue
-		}
-
-		if err = client.Ping(ctx, nil); err != nil {
-			_ = client.Disconnect(ctx)
-			l.Error(
-				"Failed to ping MongoDB",
-				zap.Error(err),
-				zap.Int("attempt", i+1),
-				zap.String("username", accountTuple.user.Username),
-				zap.String("cluster_name", clusterName),
-			)
-			time.Sleep(time.Second * 2) // Retry after a delay
-			continue
-		}
-
-		l.Info(
-			"Successfully connected to MongoDB",
-			zap.String("cluster_name", clusterName),
-			zap.String("username", accountTuple.user.Username),
-			zap.Int("attempts", i+1),
-		)
-		m.clients[clientKey] = client
-		return accountTuple.user, client, nil
+	if dialer != nil {
+		opts.SetDialer(dialer)
+		// Increase timeouts when using SOCKS5 proxy since connections take longer:
+		// proxy connect -> SOCKS5 handshake -> proxy connects to MongoDB -> TLS handshake
+		opts.SetConnectTimeout(60 * time.Second)
+		opts.SetServerSelectionTimeout(60 * time.Second)
 	}
 
-	l.Error(
-		"Failed to connect to MongoDB after multiple attempts",
+	// Single attempt: delegate retries to the baton-sdk syncer by returning
+	// codes.Unavailable on transient failures. The SDK retries ListResources /
+	// ListEntitlements / ListGrants calls with linear backoff, giving us fresh
+	// attempts with clean timeout budgets (particularly important in Lambda mode).
+	client, err := mongo.Connect(ctx, opts)
+	if err != nil {
+		l.Error(
+			"Failed to connect to MongoDB",
+			zap.Error(err),
+			zap.String("cluster_name", clusterName),
+		)
+		return nil, nil, status.Errorf(codes.Unavailable,
+			"mongo.Connect failed for cluster %q: %v", clusterName, err)
+	}
+
+	if err = client.Ping(ctx, nil); err != nil {
+		_ = client.Disconnect(ctx)
+		l.Error(
+			"Failed to ping MongoDB",
+			zap.Error(err),
+			zap.String("username", accountTuple.user.Username),
+			zap.String("cluster_name", clusterName),
+		)
+		return nil, nil, status.Errorf(codes.Unavailable,
+			"MongoDB cluster %q unreachable: %v", clusterName, err)
+	}
+
+	l.Info(
+		"Successfully connected to MongoDB",
 		zap.String("cluster_name", clusterName),
-		zap.Int("max_attempts", 10),
+		zap.String("username", accountTuple.user.Username),
 	)
-	return nil, nil, fmt.Errorf("failed to connect to MongoDB after multiple attempts")
+	m.clients[clientKey] = client
+	return accountTuple.user, client, nil
 }
 
 type connectionInfo struct {
