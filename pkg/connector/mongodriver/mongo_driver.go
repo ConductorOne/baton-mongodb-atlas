@@ -162,59 +162,73 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		)
 	}
 
-	l.Info(
-		"Connecting to MongoDB",
-		zap.String("cluster_name", clusterName),
-		zap.String("scheme", connStr.scheme),
-	)
+	const maxAttempts = 3
+	var lastErr error
 
-	opts := options.Client().
-		ApplyURI(uri).
-		SetMaxConnIdleTime(60 * time.Second).
-		SetMaxPoolSize(10)
-
-	if dialer != nil {
-		opts.SetDialer(dialer)
-		// Increase timeouts when using SOCKS5 proxy since connections take longer:
-		// proxy connect -> SOCKS5 handshake -> proxy connects to MongoDB -> TLS handshake
-		opts.SetConnectTimeout(60 * time.Second)
-		opts.SetServerSelectionTimeout(60 * time.Second)
-	}
-
-	// Single attempt: delegate retries to the baton-sdk syncer by returning
-	// codes.Unavailable on transient failures. The SDK retries ListResources /
-	// ListEntitlements / ListGrants calls with linear backoff, giving us fresh
-	// attempts with clean timeout budgets (particularly important in Lambda mode).
-	client, err := mongo.Connect(ctx, opts)
-	if err != nil {
-		l.Error(
-			"Failed to connect to MongoDB",
-			zap.Error(err),
+	for i := 0; i < maxAttempts; i++ {
+		l.Info(
+			"Connecting to MongoDB",
+			zap.Int("attempt", i+1),
 			zap.String("cluster_name", clusterName),
+			zap.String("scheme", connStr.scheme),
 		)
-		return nil, nil, status.Errorf(codes.Unavailable,
-			"mongo.Connect failed for cluster %q: %v", clusterName, err)
-	}
 
-	if err = client.Ping(ctx, nil); err != nil {
-		_ = client.Disconnect(ctx)
-		l.Error(
-			"Failed to ping MongoDB",
-			zap.Error(err),
+		opts := options.Client().
+			ApplyURI(uri).
+			SetMaxConnIdleTime(60 * time.Second).
+			SetMaxPoolSize(10)
+
+		if dialer != nil {
+			opts.SetDialer(dialer)
+			// Increase timeouts when using SOCKS5 proxy since connections take longer:
+			// proxy connect -> SOCKS5 handshake -> proxy connects to MongoDB -> TLS handshake
+			opts.SetConnectTimeout(60 * time.Second)
+			opts.SetServerSelectionTimeout(60 * time.Second)
+		}
+
+		client, err := mongo.Connect(ctx, opts)
+		if err != nil {
+			l.Error(
+				"Failed to connect to MongoDB",
+				zap.Error(err),
+				zap.Int("attempt", i+1),
+				zap.String("cluster_name", clusterName),
+			)
+			lastErr = err
+			time.Sleep(time.Second * 2)
+			continue
+		}
+
+		if err = client.Ping(ctx, nil); err != nil {
+			_ = client.Disconnect(ctx)
+			l.Error(
+				"Failed to ping MongoDB",
+				zap.Error(err),
+				zap.Int("attempt", i+1),
+				zap.String("username", accountTuple.user.Username),
+				zap.String("cluster_name", clusterName),
+			)
+			lastErr = err
+			time.Sleep(time.Second * 2)
+			continue
+		}
+
+		l.Info(
+			"Successfully connected to MongoDB",
+			zap.String("cluster_name", clusterName),
 			zap.String("username", accountTuple.user.Username),
-			zap.String("cluster_name", clusterName),
+			zap.Int("attempts", i+1),
 		)
-		return nil, nil, status.Errorf(codes.Unavailable,
-			"MongoDB cluster %q unreachable: %v", clusterName, err)
+		m.clients[clientKey] = client
+		return accountTuple.user, client, nil
 	}
 
-	l.Info(
-		"Successfully connected to MongoDB",
-		zap.String("cluster_name", clusterName),
-		zap.String("username", accountTuple.user.Username),
-	)
-	m.clients[clientKey] = client
-	return accountTuple.user, client, nil
+	// Exhausted retries — likely a configuration issue (IP access list,
+	// PrivateLink, paused cluster). Return codes.NotFound so the baton-sdk
+	// syncer does NOT retry, and the error surfaces on the sync lifecycle.
+	return nil, nil, status.Errorf(codes.NotFound,
+		"failed to connect to MongoDB cluster %q after %d attempts: %v",
+		clusterName, maxAttempts, lastErr)
 }
 
 type connectionInfo struct {
