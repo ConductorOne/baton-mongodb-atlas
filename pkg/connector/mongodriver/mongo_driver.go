@@ -130,7 +130,11 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		m.accountsPerGroupId[groupID] = accountTuple
 		// Give Atlas a moment to propagate the newly-created user before first use.
 		// Only needed after creation; cache hits above skip this.
-		time.Sleep(time.Second * 5)
+		select {
+		case <-time.After(time.Second * 5):
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		}
 	}
 
 	clientKey := fmt.Sprintf("%s-%s", groupID, clusterName)
