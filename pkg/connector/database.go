@@ -106,9 +106,12 @@ func (o *databaseBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 		_, mongoDriver, err := o.mongodriver.Connect(ctx, groupID, clusterName)
 		if err != nil {
-			l.Error("failed to connect to MongoDB Atlas cluster skipping database sync", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
-			// We are skipping databases if we can't connect to the cluster.
-			return nil, nil, nil
+			l.Error("failed to connect to MongoDB Atlas cluster", zap.String("group_id", groupID), zap.String("cluster_name", clusterName), zap.Error(err))
+			// Propagate the error so the underlying cause (e.g. IP access list /
+			// unreachable cluster) surfaces in the sync-lifecycle error instead of
+			// silently returning zero databases. Connect() returns codes.NotFound
+			// after exhausting its internal retries, which the SDK does not retry.
+			return nil, nil, fmt.Errorf("failed to connect to MongoDB Atlas cluster: %w", err)
 		}
 
 		names, err := mongoDriver.ListDatabaseNames(ctx, bson.M{}, &options.ListDatabasesOptions{

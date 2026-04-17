@@ -11,6 +11,8 @@ import (
 	"github.com/conductorone/baton-mongodb-atlas/pkg/connector/mongoconfig"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/crypto"
@@ -126,15 +128,19 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 			pass: password,
 		}
 		m.accountsPerGroupId[groupID] = accountTuple
+		// Give Atlas a moment to propagate the newly-created user before first use.
+		// Only needed after creation; cache hits above skip this.
+		select {
+		case <-time.After(time.Second * 5):
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		}
 	}
 
 	clientKey := fmt.Sprintf("%s-%s", groupID, clusterName)
-	client, ok := m.clients[clientKey]
-	if ok {
+	if client, ok := m.clients[clientKey]; ok {
 		return accountTuple.user, client, nil
 	}
-
-	time.Sleep(time.Second * 5) // Wait for the user to be fully created and available
 
 	connStr, err := m.connectionString(ctx, groupID, clusterName)
 	if err != nil {
@@ -160,9 +166,12 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		)
 	}
 
-	for i := 0; i < 10; i++ {
+	const maxAttempts = 3
+	var lastErr error
+
+	for i := 0; i < maxAttempts; i++ {
 		l.Info(
-			"Trying to connect to MongoDB",
+			"Connecting to MongoDB",
 			zap.Int("attempt", i+1),
 			zap.String("cluster_name", clusterName),
 			zap.String("scheme", connStr.scheme),
@@ -189,7 +198,12 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 				zap.Int("attempt", i+1),
 				zap.String("cluster_name", clusterName),
 			)
-			time.Sleep(time.Second * 2) // Retry after a delay
+			lastErr = err
+			select {
+			case <-time.After(time.Second * 2):
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			}
 			continue
 		}
 
@@ -202,7 +216,12 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 				zap.String("username", accountTuple.user.Username),
 				zap.String("cluster_name", clusterName),
 			)
-			time.Sleep(time.Second * 2) // Retry after a delay
+			lastErr = err
+			select {
+			case <-time.After(time.Second * 2):
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			}
 			continue
 		}
 
@@ -216,12 +235,12 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 		return accountTuple.user, client, nil
 	}
 
-	l.Error(
-		"Failed to connect to MongoDB after multiple attempts",
-		zap.String("cluster_name", clusterName),
-		zap.Int("max_attempts", 10),
-	)
-	return nil, nil, fmt.Errorf("failed to connect to MongoDB after multiple attempts")
+	// Exhausted retries — likely a configuration issue (IP access list,
+	// PrivateLink, paused cluster). Return codes.NotFound so the baton-sdk
+	// syncer does NOT retry, and the error surfaces on the sync lifecycle.
+	return nil, nil, status.Errorf(codes.NotFound,
+		"failed to connect to MongoDB cluster %q after %d attempts: %v",
+		clusterName, maxAttempts, lastErr)
 }
 
 type connectionInfo struct {
