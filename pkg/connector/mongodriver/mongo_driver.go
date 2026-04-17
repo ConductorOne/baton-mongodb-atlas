@@ -199,7 +199,11 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 				zap.String("cluster_name", clusterName),
 			)
 			lastErr = err
-			time.Sleep(time.Second * 2)
+			select {
+			case <-time.After(time.Second * 2):
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			}
 			continue
 		}
 
@@ -213,7 +217,11 @@ func (m *MongoDriver) Connect(ctx context.Context, groupID, clusterName string) 
 				zap.String("cluster_name", clusterName),
 			)
 			lastErr = err
-			time.Sleep(time.Second * 2)
+			select {
+			case <-time.After(time.Second * 2):
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			}
 			continue
 		}
 
