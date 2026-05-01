@@ -22,11 +22,15 @@ import (
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 )
 
+const (
+	roleRead = "read"
+)
+
 // Const roles for db https://www.mongodb.com/docs/atlas/mongodb-users-roles-and-privileges/#std-label-atlas-user-privileges
 // Only that uses DB.
 var dbRoles = []string{
 	"dbAdmin",   // Only db
-	"read",      // DB and collections
+	roleRead,    // DB and collections
 	"readWrite", // DB and collections
 }
 
@@ -398,7 +402,7 @@ func (o *databaseBuilder) shouldDeleteUser(roles []admin.DatabaseUserRole) bool 
 			return false
 		}
 
-		if roles[0].RoleName == "read" && roles[0].DatabaseName == "admin" {
+		if roles[0].RoleName == roleRead && roles[0].DatabaseName == "admin" {
 			return true
 		}
 	}
