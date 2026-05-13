@@ -44,7 +44,7 @@ The **Authentication Type** field determines how the provisioned database user a
 
 | Authentication type | Description | Username format |
 | :--- | :--- | :--- |
-| `SCRAM-SHA` | Password-based authentication (default). A random password is generated and stored in a C1 [vault](/product/admin/vaults). | Any string |
+| `SCRAM-SHA` | Password-based authentication (default). A random password is generated and stored in a C1 [vault](/product/admin/vaults). | Alphanumeric string (special characters such as `@` are not supported; email addresses are invalid) |
 | `AWS_IAM_USER` | AWS IAM user authentication. | AWS user ARN |
 | `X509_CUSTOMER` | Customer-managed X.509 certificate authentication. | RFC 2253 Distinguished Name |
 | `X509_MANAGED` | MongoDB Atlas-managed X.509 certificate authentication. | RFC 2253 Distinguished Name |
