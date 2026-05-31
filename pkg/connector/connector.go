@@ -41,6 +41,7 @@ func (d *MongoDB) ResourceSyncers(_ context.Context) []connectorbuilder.Resource
 		newProjectBuilder(d.client),
 		newDatabaseUserBuilder(d.client),
 		newMongoClusterBuilder(d.client, d.enableSyncDatabases),
+		newOrgApiKeyBuilder(d.client),
 	}
 
 	if d.enableSyncDatabases {

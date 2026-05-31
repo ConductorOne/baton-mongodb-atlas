@@ -61,4 +61,12 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
 	}
+
+	orgApiKeyResourceType = &v2.ResourceType{
+		Id:          "org_api_key",
+		DisplayName: "Organization API Key",
+		Description: "A MongoDB Atlas organization programmatic API key",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
+		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+	}
 )
