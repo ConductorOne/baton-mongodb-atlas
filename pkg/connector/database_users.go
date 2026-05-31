@@ -30,6 +30,8 @@ func newDatabaseUserResource(ctx context.Context, projectId *v2.ResourceId, user
 		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.Username),
 		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED), // The only possible state for this type of user.
+		// Atlas database users are programmatic DB auth credentials (machine identities), not humans.
+		rs.WithAccountType(v2.UserTrait_ACCOUNT_TYPE_SERVICE),
 	}
 
 	resource, err := rs.NewUserResource(
