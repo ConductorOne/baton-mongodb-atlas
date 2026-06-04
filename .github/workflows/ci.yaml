@@ -7,24 +7,24 @@ on:
       - main
 jobs:
   test:
-    if: false  # Remove this line to enable integration tests
     runs-on: ubuntu-latest
+    env:
+      BATON_PUBLIC_KEY: ${{ secrets.BATON_PUBLIC_KEY }}
+      BATON_PRIVATE_KEY: ${{ secrets.BATON_PRIVATE_KEY }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
       - name: Install Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Checkout code
-        uses: actions/checkout@v6
-      # Build the connector binary, then run sync-test.
-      # Configure with valid entitlement/principal IDs.
-      # Add additional test jobs as needed.
       - name: Build baton-mongodb-atlas
         run: go build ./cmd/baton-mongodb-atlas
       - name: Test connector syncing
         uses: ConductorOne/github-workflows/actions/sync-test@v4
         with:
           connector: ./baton-mongodb-atlas
-          baton-entitlement: '<entitlement-id>'
-          baton-principal: '<principal-id>'
-          baton-principal-type: 'user'
+          baton-entitlement: ${{ vars.BATON_ENTITLEMENT }}
+          baton-principal: ${{ vars.BATON_PRINCIPAL }}
+          baton-principal-type: ${{ vars.BATON_PRINCIPAL_TYPE }}
+          required-secrets: BATON_PUBLIC_KEY,BATON_PRIVATE_KEY
