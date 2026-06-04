@@ -13,6 +13,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.mongodb.org/atlas-sdk/v20250312006/admin"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type teamBuilder struct {
@@ -215,6 +217,10 @@ func (o *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		}).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
 		err = fmt.Errorf("failed to add user to team: %w", parseToUHttpError(resp, err))
+
+		if status.Code(err) == codes.AlreadyExists {
+			return annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
 
 		l.Error(
 			"failed to add user to team",
