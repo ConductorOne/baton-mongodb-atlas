@@ -260,6 +260,10 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	resp, err := o.client.TeamsApi.RemoveTeamUser(ctx, orgId, teamId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+		}
+
 		err = fmt.Errorf("failed to remove user from team: %w", parseToUHttpError(resp, err))
 
 		l.Error(
