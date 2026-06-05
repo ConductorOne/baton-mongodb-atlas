@@ -266,7 +266,6 @@ func (o *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 		}
 
-		err = fmt.Errorf("failed to remove user from team: %w", parseToUHttpError(resp, err))
 
 		l.Error(
 			"failed to remove user from team",
