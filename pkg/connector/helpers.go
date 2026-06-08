@@ -12,7 +12,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 )
 
-func getSkippEntitlementsAndGrantsAnnotations() annotations.Annotations {
+func getSkipEntitlementsAndGrantsAnnotations() annotations.Annotations {
 	annotations := annotations.Annotations{}
 	annotations.Update(&v2.SkipEntitlementsAndGrants{})
 

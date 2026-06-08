@@ -57,6 +57,7 @@ func newOrganizationResource(organization admin.AtlasOrganization) (*v2.Resource
 			&v2.ChildResourceType{ResourceTypeId: userResourceType.Id},
 			&v2.ChildResourceType{ResourceTypeId: teamResourceType.Id},
 			&v2.ChildResourceType{ResourceTypeId: projectResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: orgApiKeyResourceType.Id},
 		),
 	)
 	if err != nil {

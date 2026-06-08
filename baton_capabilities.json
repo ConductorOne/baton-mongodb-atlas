@@ -42,6 +42,25 @@
     },
     {
       "resourceType": {
+        "id": "org_api_key",
+        "displayName": "Organization API Key",
+        "traits": [
+          "TRAIT_SECRET"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          }
+        ],
+        "description": "A MongoDB Atlas organization programmatic API key"
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC"
+      ],
+      "permissions": {}
+    },
+    {
+      "resourceType": {
         "id": "organization",
         "displayName": "Organization",
         "description": "A MongoDB Atlas Organization"
