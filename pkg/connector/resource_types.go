@@ -16,7 +16,7 @@ var (
 		DisplayName: "User",
 		Description: "A MongoDB Atlas Organization User",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
-		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+		Annotations: getSkipEntitlementsAndGrantsAnnotations(),
 	}
 	teamResourceType = &v2.ResourceType{
 		Id:          "team",
@@ -35,7 +35,7 @@ var (
 		DisplayName: "Database User",
 		Description: "A MongoDB Atlas Database User",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
-		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+		Annotations: getSkipEntitlementsAndGrantsAnnotations(),
 	}
 
 	mongoClusterResourceType = &v2.ResourceType{
@@ -43,7 +43,7 @@ var (
 		DisplayName: "Mongo Cluster",
 		Description: "A MongoDB Atlas Cluster",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
-		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+		Annotations: getSkipEntitlementsAndGrantsAnnotations(),
 	}
 
 	databaseResourceType = &v2.ResourceType{
@@ -59,7 +59,7 @@ var (
 		DisplayName: "Collection",
 		Description: "MongoDB Collection",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
-		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+		Annotations: getSkipEntitlementsAndGrantsAnnotations(),
 	}
 
 	orgApiKeyResourceType = &v2.ResourceType{
@@ -67,6 +67,6 @@ var (
 		DisplayName: "Organization API Key",
 		Description: "A MongoDB Atlas organization programmatic API key",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
-		Annotations: getSkippEntitlementsAndGrantsAnnotations(),
+		Annotations: getSkipEntitlementsAndGrantsAnnotations(),
 	}
 )

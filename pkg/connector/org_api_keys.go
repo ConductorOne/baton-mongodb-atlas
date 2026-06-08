@@ -83,7 +83,7 @@ func (o *orgApiKeyBuilder) List(ctx context.Context, parentResourceID *v2.Resour
 		parentResourceID.GetResource(),
 	).PageNum(page).ItemsPerPage(resourcePageSize).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list organization API keys: %w", parseToUHttpError(resp, err))
+		return nil, nil, fmt.Errorf("baton-mongodb-atlas: failed to list organization API keys: %w", parseToUHttpError(resp, err))
 	}
 
 	if apiKeys == nil || apiKeys.Results == nil {
@@ -94,7 +94,7 @@ func (o *orgApiKeyBuilder) List(ctx context.Context, parentResourceID *v2.Resour
 	for _, apiKey := range *apiKeys.Results {
 		resource, err := newOrgApiKeyResource(ctx, parentResourceID, apiKey)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create organization API key resource: %w", err)
+			return nil, nil, fmt.Errorf("baton-mongodb-atlas: failed to create organization API key resource: %w", err)
 		}
 
 		resources = append(resources, resource)
