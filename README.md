@@ -25,7 +25,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_PUBLIC_KEY=key BATON_PRIVATE_KEY=private-key ghcr.io/conductorone/baton-mongodb-atlas:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_PUBLIC_KEY=key BATON_PRIVATE_KEY=private-key public.ecr.aws/conductorone/baton-mongodb-atlas:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
