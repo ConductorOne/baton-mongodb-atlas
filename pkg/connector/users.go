@@ -108,20 +108,20 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 	}
 
 	userTraits := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
 		rs.WithUserLogin(user.GetUsername()),
 		rs.WithEmail(user.GetUsername(), true),
 	}
 
+	var resourceStatus rs.ResourceOption
 	switch user.GetOrgMembershipStatus() {
 	case userStatusActive:
-		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED))
+		resourceStatus = rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_ENABLED, "")
 
 	case userStatusPending:
-		userTraits = append(userTraits, rs.WithDetailedStatus(v2.UserTrait_Status_STATUS_ENABLED, userStatusPending))
+		resourceStatus = rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_ENABLED, userStatusPending)
 
 	default:
-		userTraits = append(userTraits, rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED))
+		resourceStatus = rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_UNSPECIFIED, "")
 	}
 
 	resource, err := rs.NewUserResource(
@@ -130,6 +130,8 @@ func newUserResource(ctx context.Context, organizationId *v2.ResourceId, user at
 		userId,
 		userTraits,
 		rs.WithParentResourceID(organizationId),
+		rs.WithResourceProfile(profile),
+		resourceStatus,
 	)
 	if err != nil {
 		return nil, err

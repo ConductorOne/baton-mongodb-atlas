@@ -93,10 +93,6 @@ func newMongoClusterResource(
 		"cluster_state": cluster.GetStateName(),
 	}
 
-	appTraits := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-
 	name := cluster.GetName()
 	if name == "" {
 		name = cluster.GetId()
@@ -106,6 +102,7 @@ func newMongoClusterResource(
 
 	opts := []rs.ResourceOption{
 		rs.WithParentResourceID(parentId),
+		rs.WithResourceProfile(profile),
 	}
 
 	state := cluster.GetStateName()
@@ -122,7 +119,7 @@ func newMongoClusterResource(
 		name,
 		mongoClusterResourceType,
 		id,
-		appTraits,
+		nil,
 		opts...,
 	)
 	if err != nil {

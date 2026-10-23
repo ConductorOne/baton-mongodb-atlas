@@ -49,16 +49,13 @@ func newProjectResource(ctx context.Context, organizationId *v2.ResourceId, proj
 		"name":       project.Name,
 	}
 
-	projectTraits := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
-
 	resource, err := rs.NewGroupResource(
 		project.Name,
 		projectResourceType,
 		projectId,
-		projectTraits,
+		nil,
 		rs.WithParentResourceID(organizationId),
+		rs.WithResourceProfile(profile),
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: databaseUserResourceType.Id},
 			&v2.ChildResourceType{ResourceTypeId: mongoClusterResourceType.Id},
