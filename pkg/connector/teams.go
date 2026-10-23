@@ -48,17 +48,14 @@ func newTeamResource(_ context.Context, organizationId *v2.ResourceId, team admi
 		profile["organization_id"] = organizationId.Resource
 	}
 
-	teamTraits := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
-
 	resourceId := fmt.Sprintf("%s:%s", organizationId.Resource, teamId)
 	resource, err := rs.NewGroupResource(
 		teamName,
 		teamResourceType,
 		resourceId,
-		teamTraits,
+		nil,
 		rs.WithParentResourceID(organizationId),
+		rs.WithResourceProfile(profile),
 	)
 	if err != nil {
 		return nil, err

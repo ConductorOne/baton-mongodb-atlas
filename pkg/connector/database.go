@@ -179,12 +179,9 @@ func newDatabaseResource(groupID string, clusterName string, dbName string, pare
 		"db_name": dbName,
 	}
 
-	appTraits := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-
 	rsOptions := []rs.ResourceOption{
 		rs.WithParentResourceID(parentId),
+		rs.WithResourceProfile(profile),
 	}
 
 	if enableMongoDriver {
@@ -199,7 +196,7 @@ func newDatabaseResource(groupID string, clusterName string, dbName string, pare
 		fmt.Sprintf("%s - %s", clusterName, dbName),
 		databaseResourceType,
 		id,
-		appTraits,
+		nil,
 		rsOptions...,
 	)
 	if err != nil {
