@@ -23,6 +23,8 @@ The MongoDB Atlas connector supports [automatic account provisioning and deprovi
 
 When a new account is created using the default `SCRAM-SHA` authentication type, the account's password is sent to a [vault](/product/admin/vaults).
 
+When C1 grants a project role to a user who is already a member of that project, the role is added alongside the user's existing project roles. Because MongoDB Atlas requires every project member to have at least one project role, revoking a user's last remaining project role removes the user from the project.
+
 ## Account provisioning
 
 When C1 provisions a new account through the MongoDB Atlas connector, the connector creates a **database user** in the specified MongoDB Atlas project. By default, the connector also sends an **organization invitation** to the user's email address, granting them access to the MongoDB Atlas console. You can disable this behavior by turning off the **Create invite** setting on the connector.
