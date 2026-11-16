@@ -200,6 +200,14 @@ func TestProjectGrant(t *testing.T) {
 			},
 		},
 		{
+			name: "lookup 404 with unexpected code returns error",
+			responses: map[string]mockResponse{
+				"GET " + userPath: {http.StatusNotFound, apiError(http.StatusNotFound, "RESOURCE_NOT_FOUND")},
+			},
+			slug:     ownerEntitlement,
+			wantCode: codes.NotFound,
+		},
+		{
 			name: "lookup forbidden returns error without mutation",
 			responses: map[string]mockResponse{
 				"GET " + userPath: {http.StatusForbidden, apiError(http.StatusForbidden, "USER_UNAUTHORIZED")},
@@ -254,11 +262,43 @@ func TestProjectRevoke(t *testing.T) {
 		{
 			name: "last role removes user from project",
 			responses: map[string]mockResponse{
-				"GET " + userPath:    {http.StatusOK, projectUser("GROUP_OWNER")},
-				"DELETE " + userPath: {http.StatusNoContent, nil},
+				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusForbidden, apiError(http.StatusForbidden, "CANNOT_REMOVE_ALL_USER_ROLES")},
+				"DELETE " + userPath:     {http.StatusNoContent, nil},
+			},
+			slug: ownerEntitlement,
+			wantMutations: []recordedCall{
+				{method: http.MethodPost, path: removeRolePath, body: map[string]any{"groupRole": "GROUP_OWNER"}},
+				{method: http.MethodDelete, path: userPath},
+			},
+		},
+		{
+			name: "user removed before role removal",
+			responses: map[string]mockResponse{
+				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_DATA_ACCESS_READ_WRITE", "GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusNotFound, apiError(http.StatusNotFound, "USER_NOT_IN_GROUP")},
 			},
 			slug:          ownerEntitlement,
-			wantMutations: []recordedCall{{method: http.MethodDelete, path: userPath}},
+			wantRevoked:   true,
+			wantMutations: []recordedCall{{method: http.MethodPost, path: removeRolePath, body: map[string]any{"groupRole": "GROUP_OWNER"}}},
+		},
+		{
+			name: "role removal forbidden for other reason returns error",
+			responses: map[string]mockResponse{
+				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_DATA_ACCESS_READ_WRITE", "GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusForbidden, apiError(http.StatusForbidden, "USER_UNAUTHORIZED")},
+			},
+			slug:          ownerEntitlement,
+			wantCode:      codes.PermissionDenied,
+			wantMutations: []recordedCall{{method: http.MethodPost, path: removeRolePath, body: map[string]any{"groupRole": "GROUP_OWNER"}}},
+		},
+		{
+			name: "lookup 404 with unexpected code returns error",
+			responses: map[string]mockResponse{
+				"GET " + userPath: {http.StatusNotFound, apiError(http.StatusNotFound, "RESOURCE_NOT_FOUND")},
+			},
+			slug:     ownerEntitlement,
+			wantCode: codes.NotFound,
 		},
 		{
 			name: "role not held",
