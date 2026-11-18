@@ -34,13 +34,13 @@ Granting a project role adds it to the user's existing project roles, or adds th
 
 ## Account provisioning
 
-When C1 provisions a new account through the MongoDB Atlas connector, the connector creates a **database user** in the specified MongoDB Atlas project. By default, the connector also sends an **organization invitation** to the user's email address, granting them access to the MongoDB Atlas console. You can disable this behavior by turning off the **Create invite** setting on the connector.
+When C1 provisions a new account through the MongoDB Atlas connector, the connector creates a **database user** in the specified MongoDB Atlas project. By default, the connector also sends an **organization invitation** to the user's email address, granting them access to the MongoDB Atlas console. You can disable this behavior by turning off the **Create Invite** setting on the connector.
 
 ### Provisioning fields
 
 | Field | Required | Description |
 | :--- | :--- | :--- |
-| Email | Yes (unless **Create invite** is disabled) | The email address for the organization invitation. |
+| Email | Yes (unless **Create Invite** is disabled) | The email address for the organization invitation. |
 | Username | Yes | The username for the new database user. The required format depends on the authentication type. |
 | Organization ID | Yes | The ID of the MongoDB Atlas organization. |
 | Group ID | Yes | The 24-character hex string that identifies the MongoDB Atlas project. |
@@ -69,7 +69,7 @@ When using `SCRAM-SHA`, the provisioned user retrieves their database password f
 
 When account provisioning runs, the connector performs these steps:
 
-1. **Organization invitation** (optional): If **Create invite** is enabled (the default), the connector invites the user to the MongoDB Atlas organization. If the user already exists in the organization, this step is skipped.
+1. **Organization invitation** (optional): If **Create Invite** is enabled (the default), the connector invites the user to the MongoDB Atlas organization. If the user already exists in the organization, this step is skipped.
 
 2. **Database user creation**: The connector creates a database user in the specified project with the chosen authentication type. The new database user is assigned a default `read` role on the `admin` database. You can grant additional database roles (such as `readWrite` or `dbAdmin`) through C1 entitlements after the account is provisioned.
 
@@ -168,7 +168,7 @@ Paste the public key into the **Public key** field.
 Paste the private key into the **Private key** field.
 </Step>
 <Step>
-**Optional.** If desired, click to enable **Create invite**, which will create email invitations for new MongoDB accounts provisioned by C1.
+**Optional.** If desired, click to enable **Create Invite**, which will create email invitations for new MongoDB accounts provisioned by C1.
 </Step>
 <Step>
 **Optional.** If desired, click to enable **Sync Databases** and **Enable Mongo Driver**. The combination of these two settings allows the connector to discover and sync databases and collections from MongoDB Atlas clusters.
