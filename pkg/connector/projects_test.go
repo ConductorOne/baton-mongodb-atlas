@@ -268,7 +268,8 @@ func TestProjectRevoke(t *testing.T) {
 			responses: map[string]mockResponse{
 				"GET " + userPath: {http.StatusOK, projectUser("GROUP_OWNER")},
 				"POST " + removeRolePath: {http.StatusForbidden, map[string]any{
-					"detail":     "Cannot remove the user's only project-level role. Add the new role before removing the old role, or use the 'Remove One MongoDB Cloud User from One Project' endpoint to remove the user from the project entirely.",
+					"detail": "Cannot remove the user's only project-level role. Add the new role before removing the old role, " +
+						"or use the 'Remove One MongoDB Cloud User from One Project' endpoint to remove the user from the project entirely.",
 					"error":      http.StatusForbidden,
 					"errorCode":  "CANNOT_REMOVE_LAST_GROUP_ROLE",
 					"parameters": []any{},
