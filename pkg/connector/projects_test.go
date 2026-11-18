@@ -237,6 +237,10 @@ func TestProjectGrant(t *testing.T) {
 
 func TestProjectRevoke(t *testing.T) {
 	ctx := context.Background()
+	lastRoleMutations := []recordedCall{
+		{method: http.MethodPost, path: removeRolePath, body: map[string]any{"groupRole": "GROUP_OWNER"}},
+		{method: http.MethodDelete, path: userPath},
+	}
 
 	tests := []struct {
 		name          string
@@ -262,15 +266,50 @@ func TestProjectRevoke(t *testing.T) {
 		{
 			name: "last role removes user from project",
 			responses: map[string]mockResponse{
+				"GET " + userPath: {http.StatusOK, projectUser("GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusForbidden, map[string]any{
+					"detail":     "Cannot remove the user's only project-level role. Add the new role before removing the old role, or use the 'Remove One MongoDB Cloud User from One Project' endpoint to remove the user from the project entirely.",
+					"error":      http.StatusForbidden,
+					"errorCode":  "CANNOT_REMOVE_LAST_GROUP_ROLE",
+					"parameters": []any{},
+					"reason":     "Forbidden",
+				}},
+				"DELETE " + userPath: {http.StatusNoContent, nil},
+			},
+			slug:          ownerEntitlement,
+			wantMutations: lastRoleMutations,
+		},
+		{
+			name: "all roles removal refused removes user from project",
+			responses: map[string]mockResponse{
 				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_OWNER")},
 				"POST " + removeRolePath: {http.StatusForbidden, apiError(http.StatusForbidden, "CANNOT_REMOVE_ALL_USER_ROLES")},
 				"DELETE " + userPath:     {http.StatusNoContent, nil},
 			},
-			slug: ownerEntitlement,
-			wantMutations: []recordedCall{
-				{method: http.MethodPost, path: removeRolePath, body: map[string]any{"groupRole": "GROUP_OWNER"}},
-				{method: http.MethodDelete, path: userPath},
+			slug:          ownerEntitlement,
+			wantMutations: lastRoleMutations,
+		},
+		{
+			name: "user removed before fallback removal",
+			responses: map[string]mockResponse{
+				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusForbidden, apiError(http.StatusForbidden, "CANNOT_REMOVE_LAST_GROUP_ROLE")},
+				"DELETE " + userPath:     {http.StatusNotFound, apiError(http.StatusNotFound, "USER_NOT_IN_GROUP")},
 			},
+			slug:          ownerEntitlement,
+			wantRevoked:   true,
+			wantMutations: lastRoleMutations,
+		},
+		{
+			name: "fallback removal failure returns error",
+			responses: map[string]mockResponse{
+				"GET " + userPath:        {http.StatusOK, projectUser("GROUP_OWNER")},
+				"POST " + removeRolePath: {http.StatusForbidden, apiError(http.StatusForbidden, "CANNOT_REMOVE_LAST_GROUP_ROLE")},
+				"DELETE " + userPath:     {http.StatusInternalServerError, apiError(http.StatusInternalServerError, "UNEXPECTED_ERROR")},
+			},
+			slug:          ownerEntitlement,
+			wantCode:      codes.Unavailable,
+			wantMutations: lastRoleMutations,
 		},
 		{
 			name: "user removed before role removal",

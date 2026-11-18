@@ -262,6 +262,18 @@ func isAtlasError(resp *http.Response, err error, statusCode int, errorCode stri
 	return resp != nil && resp.StatusCode == statusCode && admin.IsErrorCode(err, errorCode)
 }
 
+const (
+	// errCannotRemoveLastGroupRole is undocumented but is what :removeRole returns for a user's only project role.
+	errCannotRemoveLastGroupRole = "CANNOT_REMOVE_LAST_GROUP_ROLE"
+	// errCannotRemoveAllUserRoles is documented in the Atlas API error reference.
+	errCannotRemoveAllUserRoles = "CANNOT_REMOVE_ALL_USER_ROLES"
+)
+
+func isLastProjectRoleError(resp *http.Response, err error) bool {
+	return isAtlasError(resp, err, http.StatusForbidden, errCannotRemoveLastGroupRole) ||
+		isAtlasError(resp, err, http.StatusForbidden, errCannotRemoveAllUserRoles)
+}
+
 // getProjectUserRoles returns found=false only when Atlas reports USER_NOT_IN_GROUP.
 func (p *projectBuilder) getProjectUserRoles(ctx context.Context, projectId, userId string) ([]string, bool, error) {
 	user, resp, err := p.client.MongoDBCloudUsersApi.GetProjectUser(ctx, projectId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
@@ -423,7 +435,7 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
 	}
 	// Atlas refuses to remove a user's last project role, so remove the user from the project instead.
-	if !isAtlasError(resp, err, http.StatusForbidden, "CANNOT_REMOVE_ALL_USER_ROLES") {
+	if !isLastProjectRoleError(resp, err) {
 		return nil, fmt.Errorf("baton-mongodb-atlas: failed to remove project role: %w", parseToUHttpError(resp, err))
 	}
 
