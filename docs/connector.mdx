@@ -28,8 +28,8 @@ Granting a project role adds it to the user's existing project roles, or adds th
 **Notes:**
 
 - The Provision column for Database users covers deletion. The connector addresses a database user under the `admin` authentication database, so deletion applies to `SCRAM-SHA` users. Creating a database user is part of account provisioning, covered by the Accounts row.
-- Databases sync only when the cluster reports them. Enable the **Database** resource type on the connector. Free-tier clusters do not report databases to the Atlas monitoring API, so they sync no databases under the default settings. Enable **Enable Mongo driver** to discover databases and collections through a direct connection to the cluster instead.
-- Project access covers these eleven Atlas project roles: `GROUP_OWNER`, `GROUP_CLUSTER_MANAGER`, `GROUP_DATA_ACCESS_ADMIN`, `GROUP_DATA_ACCESS_READ_WRITE`, `GROUP_DATA_ACCESS_READ_ONLY`, `GROUP_READ_ONLY`, `GROUP_SEARCH_INDEX_EDITOR`, `GROUP_STREAM_PROCESSING_OWNER`, `GROUP_BACKUP_MANAGER`, `GROUP_OBSERVABILITY_VIEWER`, and `GROUP_DATABASE_ACCESS_ADMIN`. A user holding any other project role appears in C1 without it, so that access is invisible to an access review.
+- Databases sync only when the cluster reports them. Keep **Sync Databases** enabled; it is on by default. Free-tier clusters do not report databases to the Atlas monitoring API, so they sync no databases under the default settings. Enable **Enable Mongo Driver** to discover databases and collections through a direct connection to the cluster instead.
+- Project access covers these eleven Atlas project roles: `GROUP_OWNER`, `GROUP_CLUSTER_MANAGER`, `GROUP_DATA_ACCESS_ADMIN`, `GROUP_DATA_ACCESS_READ_WRITE`, `GROUP_DATA_ACCESS_READ_ONLY`, `GROUP_READ_ONLY`, `GROUP_SEARCH_INDEX_EDITOR`, `GROUP_STREAM_PROCESSING_OWNER`, `GROUP_BACKUP_MANAGER`, `GROUP_OBSERVABILITY_VIEWER`, and `GROUP_DATABASE_ACCESS_ADMIN`. A user holding any other project role appears in C1 without it, so that access is invisible to an access review. Revoking a project role removes the user from the project, including any other project roles they hold.
 - Database access covers the `dbAdmin`, `read`, and `readWrite` roles granted on a database. Roles scoped to a single collection, and database roles outside those three, sync without a grant.
 
 ## Account provisioning
@@ -115,7 +115,7 @@ If you're using a self-hosted connector, add the IP address of your connector ho
 </Tip>
 </Step>
 <Step>
-**Optional.** To sync databases and collections, for each project, add the IP addresses listed on the [C1 Baton FAQ page](/baton/faq#which-ip-addresses-does-conductorone-use-for-connectors) to **Database & Network Access** > **IP Access List**. See the **Sync databases** and **Enable Mongo driver** configuration options below.
+**Optional.** To sync databases and collections, for each project, add the IP addresses listed on the [C1 Baton FAQ page](/baton/faq#which-ip-addresses-does-conductorone-use-for-connectors) to **Database & Network Access** > **IP Access List**. See the **Sync Databases** and **Enable Mongo Driver** configuration options below.
 </Step>
 <Step>
 Carefully copy and save the public key and private key.
@@ -171,7 +171,7 @@ Paste the private key into the **Private key** field.
 **Optional.** If desired, click to enable **Create invite**, which will create email invitations for new MongoDB accounts provisioned by C1.
 </Step>
 <Step>
-**Optional.** If desired, click to enable **Sync databases** and **Enable Mongo driver**. The combination of these two settings allows the connector to discover and sync databases and collections from MongoDB Atlas clusters.
+**Optional.** If desired, click to enable **Sync Databases** and **Enable Mongo Driver**. The combination of these two settings allows the connector to discover and sync databases and collections from MongoDB Atlas clusters.
 </Step>
 <Step>
 **Optional.** If desired, click to enable **Enable Delete Database User when only having read@admin**. This tells the connector to delete database users that only have the `read@admin` role when revoking access.
@@ -254,21 +254,21 @@ stringData:
   BATON_PUBLIC_KEY: <MongoDB public key>
 
   # Optional: include if you want C1 to provision access using this connector
-  BATON_PROVISIONING: true
+  BATON_PROVISIONING: "true"
 
   # Optional: include if you want invitation emails to be created for newly created user accounts
-  BATON_CREATE_INVITE_KEY: true
+  BATON_CREATE_INVITE_KEY: "true"
 
   # Optional: include if you want to sync databases and roles
-  BATON_ENABLE_SYNC_DATABASES: true
+  BATON_ENABLE_SYNC_DATABASES: "true"
 
   # Optional: include to discover databases and collections over a direct connection to the
   # cluster. The connector host must reach the cluster on the MongoDB protocol and its address
   # must be on the project's Network Access list, which is separate from the API access list.
-  BATON_ENABLE_MONGO_DRIVER: false
+  BATON_ENABLE_MONGO_DRIVER: "false"
 
   # Optional: include if you want to delete database users that only have the read@admin role when revoking access
-  BATON_DELETE_DATABASE_USER_WITH_READ_ONLY: true
+  BATON_DELETE_DATABASE_USER_WITH_READ_ONLY: "true"
 ```
 
 See the connector's README or run `--help` to see all available configuration flags and environment variables.
@@ -291,7 +291,7 @@ spec:
     metadata:
       labels:
         app: baton-mongodb
-        baton: true
+        baton: "true"
         baton-app: mongodb
     spec:
       containers:

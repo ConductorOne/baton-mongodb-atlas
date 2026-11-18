@@ -52,8 +52,10 @@ baton resources
 - Databases (`--enable-sync-databases`, on by default)
 - Collections (requires `--enable-mongo-driver`)
 
-It also provisions access: it creates and deletes accounts, grants and revokes organization,
-project, team and database roles, and deletes database users.
+It also provisions access: it creates and deletes accounts, grants and revokes organization and
+database roles, adds and removes team members, grants project roles, and deletes database users.
+Revoking a project role removes the user from the project, including any other project roles they
+hold.
 
 # Contributing, Support and Issues
 
