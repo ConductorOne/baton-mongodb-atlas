@@ -3,6 +3,8 @@ package connector
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"slices"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -256,6 +258,52 @@ func (p *projectBuilder) GrantDatabaseUsers(ctx context.Context, resource *v2.Re
 	return rv, len(*members.Results), nil
 }
 
+func isAtlasError(resp *http.Response, err error, statusCode int, errorCode string) bool {
+	return resp != nil && resp.StatusCode == statusCode && admin.IsErrorCode(err, errorCode)
+}
+
+const (
+	// errCannotRemoveLastGroupRole is undocumented but is what :removeRole returns for a user's only project role.
+	errCannotRemoveLastGroupRole = "CANNOT_REMOVE_LAST_GROUP_ROLE"
+	// errCannotRemoveAllUserRoles is documented in the Atlas API error reference.
+	errCannotRemoveAllUserRoles = "CANNOT_REMOVE_ALL_USER_ROLES"
+)
+
+func isLastProjectRoleError(resp *http.Response, err error) bool {
+	return isAtlasError(resp, err, http.StatusForbidden, errCannotRemoveLastGroupRole) ||
+		isAtlasError(resp, err, http.StatusForbidden, errCannotRemoveAllUserRoles)
+}
+
+// getProjectUserRoles returns found=false only when Atlas reports USER_NOT_IN_GROUP.
+func (p *projectBuilder) getProjectUserRoles(ctx context.Context, projectId, userId string) ([]string, bool, error) {
+	user, resp, err := p.client.MongoDBCloudUsersApi.GetProjectUser(ctx, projectId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		if isAtlasError(resp, err, http.StatusNotFound, "USER_NOT_IN_GROUP") {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("baton-mongodb-atlas: failed to get project user: %w", parseToUHttpError(resp, err))
+	}
+	if user == nil {
+		return nil, false, nil
+	}
+
+	return user.GetRoles(), true, nil
+}
+
+func (p *projectBuilder) addProjectRole(ctx context.Context, projectId, userId, role string) error {
+	_, resp, err := p.client.MongoDBCloudUsersApi.AddProjectRole(
+		ctx,
+		projectId,
+		userId,
+		admin.NewAddOrRemoveGroupRole(role),
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		return fmt.Errorf("baton-mongodb-atlas: failed to add project role: %w", parseToUHttpError(resp, err))
+	}
+
+	return nil
+}
+
 func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
@@ -293,26 +341,49 @@ func (p *projectBuilder) Grant(ctx context.Context, principal *v2.Resource, enti
 		entitlementSlug = slug
 	}
 
-	username := trait.GetLogin()
+	projectId := entitlement.Resource.Id.Resource
+	userId := principal.Id.Resource
+
+	roles, found, err := p.getProjectUserRoles(ctx, projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	if found {
+		if slices.Contains(roles, entitlementSlug) {
+			return annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
+		if err := p.addProjectRole(ctx, projectId, userId, entitlementSlug); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
 	_, resp, err := p.client.MongoDBCloudUsersApi.AddProjectUser(
 		ctx,
-		entitlement.Resource.Id.Resource,
+		projectId,
 		&admin.GroupUserRequest{
-			Username: username,
+			Username: trait.GetLogin(),
 			Roles:    []string{entitlementSlug},
 		},
 	).Execute() //nolint:bodyclose // The SDK handles closing the response body
 	if err != nil {
-		err = fmt.Errorf("failed to add user to project: %w", parseToUHttpError(resp, err))
+		// The user may have joined the project after the lookup; Atlas reports this as USER_ALREADY_IN_GROUP.
+		if resp != nil &&
+			(resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusConflict) &&
+			admin.IsErrorCode(err, "USER_ALREADY_IN_GROUP") {
+			l.Debug(
+				"user already in project, adding role instead",
+				zap.String("user_id", userId),
+				zap.String("project_id", projectId),
+			)
+			if err := p.addProjectRole(ctx, projectId, userId, entitlementSlug); err != nil {
+				return nil, err
+			}
+			return nil, nil
+		}
 
-		l.Error(
-			"failed to add user to project",
-			zap.Error(err),
-			zap.String("user_id", principal.Id.Resource),
-			zap.String("project_id", entitlement.Resource.Id.Resource),
-		)
-
-		return nil, err
+		return nil, fmt.Errorf("baton-mongodb-atlas: failed to add user to project: %w", parseToUHttpError(resp, err))
 	}
 
 	return nil, nil
@@ -334,22 +405,46 @@ func (p *projectBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotatio
 		return nil, err
 	}
 
-	resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectUser(
-		ctx,
-		grant.Entitlement.Resource.Id.Resource,
-		grant.Principal.Id.Resource,
-	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	role, ok := projectEntitlementsUserRolesMap[grant.Entitlement.Slug]
+	if !ok {
+		return nil, fmt.Errorf("baton-mongodb-atlas: unknown entitlement: entitlement %s is not recognized", grant.Entitlement.Slug)
+	}
+
+	projectId := grant.Entitlement.Resource.Id.Resource
+	userId := grant.Principal.Id.Resource
+
+	roles, found, err := p.getProjectUserRoles(ctx, projectId, userId)
 	if err != nil {
-		err = fmt.Errorf("failed to remove user from project: %w", parseToUHttpError(resp, err))
-
-		l.Error(
-			"failed to remove user from project",
-			zap.Error(err),
-			zap.String("user_id", grant.Principal.Id.Resource),
-			zap.String("project_id", grant.Entitlement.Resource.Id.Resource),
-		)
-
 		return nil, err
+	}
+
+	if !found || !slices.Contains(roles, role) {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+
+	_, resp, err := p.client.MongoDBCloudUsersApi.RemoveProjectRole(
+		ctx,
+		projectId,
+		userId,
+		admin.NewAddOrRemoveGroupRole(role),
+	).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err == nil {
+		return nil, nil
+	}
+	if isAtlasError(resp, err, http.StatusNotFound, "USER_NOT_IN_GROUP") {
+		return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+	}
+	// Atlas refuses to remove a user's last project role, so remove the user from the project instead.
+	if !isLastProjectRoleError(resp, err) {
+		return nil, fmt.Errorf("baton-mongodb-atlas: failed to remove project role: %w", parseToUHttpError(resp, err))
+	}
+
+	resp, err = p.client.MongoDBCloudUsersApi.RemoveProjectUser(ctx, projectId, userId).Execute() //nolint:bodyclose // The SDK handles closing the response body
+	if err != nil {
+		if isAtlasError(resp, err, http.StatusNotFound, "USER_NOT_IN_GROUP") {
+			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+		}
+		return nil, fmt.Errorf("baton-mongodb-atlas: failed to remove user from project: %w", parseToUHttpError(resp, err))
 	}
 
 	return nil, nil
