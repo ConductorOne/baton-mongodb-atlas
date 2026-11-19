@@ -263,9 +263,10 @@ stringData:
   BATON_ENABLE_SYNC_DATABASES: "true"
 
   # Optional: include to discover databases and collections over a direct connection to the
-  # cluster. The connector host must reach the cluster on the MongoDB protocol and its address
-  # must be on the project's Network Access list, which is separate from the API access list.
-  BATON_ENABLE_MONGO_DRIVER: "false"
+  # cluster, which is off by default. The connector host must reach the cluster on the MongoDB
+  # protocol and its address must be on the project's Network Access list, which is separate
+  # from the API access list.
+  BATON_ENABLE_MONGO_DRIVER: "true"
 
   # Optional: include if you want to delete database users that only have the read@admin role when revoking access
   BATON_DELETE_DATABASE_USER_WITH_READ_ONLY: "true"
